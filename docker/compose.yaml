@@ -1,0 +1,123 @@
+# Milvus standalone + 可选 Neo4j / SearXNG
+# 用法：
+#   make up          # 仅 Milvus（默认）
+#   make up-graph    # Milvus + Neo4j
+#   make up-all      # Milvus + Neo4j + SearXNG
+# 数据卷全部落在 D 盘（DOCKER_VOLUME_DIRECTORY 由 Makefile 注入）
+
+name: ragm
+
+x-milvus-image: &milvus-image milvusdb/milvus:v3.0.4
+
+services:
+  # 一次性修正 volume 属主（镜像内 milvus 用户 uid 固定）
+  milvus-volume-init:
+    image: *milvus-image
+    user: "0:0"
+    network_mode: none
+    read_only: true
+    restart: "no"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -eu
+        uid="$$(id -u milvus)"
+        gid="$$(id -g milvus)"
+        marker="/var/lib/milvus/.milvus-volume-owner-$${uid}-$${gid}"
+        if [ ! -e "$${marker}" ]; then
+          chown -R "$${uid}:$${gid}" /var/lib/milvus
+          touch "$${marker}"
+          chown "$${uid}:$${gid}" "$${marker}"
+        fi
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY:?set DOCKER_VOLUME_DIRECTORY}/milvus_volumes/milvus:/var/lib/milvus
+
+  etcd:
+    container_name: ragm-etcd
+    image: quay.io/coreos/etcd:v3.5.25
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY}/milvus_volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://etcd:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  minio:
+    container_name: ragm-minio
+    image: milvusdb/minio:RELEASE.2024-12-18T13-15-44Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY}/milvus_volumes/minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  standalone:
+    container_name: ragm-milvus
+    image: *milvus-image
+    command: ["milvus", "run", "standalone"]
+    security_opt:
+      - seccomp:unconfined
+    environment:
+      MINIO_REGION: us-east-1
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+    ports:
+      - "19530:19530"
+      - "9091:9091"
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY}/milvus_volumes/milvus:/var/lib/milvus
+    depends_on:
+      etcd:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      interval: 30s
+      start_period: 90s
+
+  # ---------- 可选：图数据库 ----------
+  neo4j:
+    container_name: ragm-neo4j
+    image: ${NEO4J_IMAGE:-docker.1panel.live/library/neo4j:5.26-community}
+    profiles: ["graph"]
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-ragm-local-dev}
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1g
+      NEO4J_server_memory_pagecache_size: 512m
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY}/neo4j_data/data:/data
+      - ${DOCKER_VOLUME_DIRECTORY}/neo4j_data/logs:/logs
+
+  # ---------- 可选：自建搜索 ----------
+  searxng:
+    container_name: ragm-searxng
+    image: ${SEARXNG_IMAGE:-docker.1panel.live/searxng/searxng:latest}
+    profiles: ["search"]
+    ports:
+      - "8080:8080"
+    environment:
+      SEARXNG_BASE_URL: http://localhost:8080/
+    volumes:
+      - ${DOCKER_VOLUME_DIRECTORY}/searxng:/etc/searxng
+    restart: unless-stopped
