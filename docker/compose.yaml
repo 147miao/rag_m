@@ -3,7 +3,7 @@
 #   make up          # 仅 Milvus（默认）
 #   make up-graph    # Milvus + Neo4j
 #   make up-all      # Milvus + Neo4j + SearXNG
-# 数据卷全部落在 D 盘（DOCKER_VOLUME_DIRECTORY 由 Makefile 注入）
+# 容器卷放项目内 .volumes/（Docker Desktop 只共享 $HOME；D 盘留给 host 侧的数据集与模型）
 
 name: ragm
 

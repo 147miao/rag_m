@@ -13,6 +13,7 @@ __pycache__/
 # data & artifacts (stored on D drive, not in git)
 data/
 models/
+.volumes/
 reports/*.png
 reports/*.json
 logs/

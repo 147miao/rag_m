@@ -227,3 +227,35 @@ rag_m/
 ├── reports/                  # 评测报告与图表
 └── docs/                     # 架构、决策记录、badcase
 ```
+
+---
+
+## 十一、存储布局（D 盘，2026-10-30 新增）
+
+用户新加了一块盘：`/dev/nvme0n1p5` → **ext4，270 GB，可用 256 GB**，挂载在 `/run/media/myj/D`（udisks 自动挂载，用户可写）。系统盘只剩 48 GB，因此**数据、模型、容器卷全部放 D 盘**，代码留系统盘。
+
+```
+/run/media/myj/D/rag_m/
+├── data/            # 原始数据集 + 处理后的 chunk + corpus（预计 10~20 GB）
+├── models/          # embedding / reranker 权重（预计 8~15 GB）
+├── hf_cache/        # HF_HOME（HF_ENDPOINT=hf-mirror）
+├── ms_cache/        # MODELSCOPE_CACHE
+├── milvus_volumes/  # etcd / minio / milvus 数据（compose 挂载）
+├── neo4j_data/      # 图数据库数据
+├── reports/         # 评测产物
+└── searxng/         # 自建搜索配置
+```
+
+**⚠️ 实测坑（2026-10-30）：Docker Desktop 只共享 `$HOME`**
+把 compose 的 volume 指到 `/run/media/myj/D/...` 时，容器内看似正常，但 **host 侧目录始终为空**——bind mount 静默落进了 Docker Desktop 的 VM 内部（host 看不到，重启即丢）。验证方法：容器里写文件后 host 看不到。
+因此：**容器卷放项目内 `.volumes/`（系统盘，体量小，Milvus 索引约 1~3 GB），D 盘只放 host 侧进程读写的数据集/模型/缓存**。
+若确实要把 Milvus/Neo4j 数据也放 D：需在 Docker Desktop GUI 的 Settings → Resources → File sharing 里把 `/run/media` 加进去（需要你手动操作，CLI 无此开关）。
+
+**接入方式（已落地到 M0 骨架）**
+- `Makefile` 导出 `DOCKER_VOLUME_DIRECTORY=$(CURDIR)/.volumes`（容器卷）；`RAGM_DATA_ROOT=$(DATA_ROOT)`（host 侧数据）；
+- `.env` 里 `RAGM_DATA_ROOT=/run/media/myj/D/rag_m`，`HF_HOME` / `MODELSCOPE_CACHE` 同步指向 D；
+- `src/ragm/config.py` 启动时校验 `data_root` 的父目录**必须是挂载点**，防止 D 盘未挂载时把数据写进 `/run`（tmpfs，会吃内存）；可用 `RAGM_REQUIRE_MOUNT=false` 覆盖；
+- 项目根目录建了 `data -> /run/media/myj/D/rag_m/data` 软链，方便查看，但**代码只认 `RAGM_DATA_ROOT`**，不依赖软链。
+
+**风险**：`/run/media/` 是 udisks 的临时挂载点，重启后路径可能变化或需要重新挂载。对策：`make check-data` 预检 + 配置层挂载校验；若希望永久固定，可让用户加一条 `/etc/fstab`（需要 sudo，作为可选项）。
+

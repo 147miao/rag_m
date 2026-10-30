@@ -1,6 +1,8 @@
 SHELL := /bin/bash
 DATA_ROOT ?= /run/media/myj/D/rag_m
-export DOCKER_VOLUME_DIRECTORY ?= $(DATA_ROOT)
+# 注意：Docker Desktop 只共享 $HOME，/run/media 下的 bind mount 会静默落到 VM 内部（host 看不到）。
+# 因此容器卷放项目内 .volumes/（系统盘，体量小），D 盘只放数据集/模型/缓存（host 侧进程读写）。
+export DOCKER_VOLUME_DIRECTORY ?= $(CURDIR)/.volumes
 export HF_ENDPOINT ?= https://hf-mirror.com
 export HF_HOME ?= $(DATA_ROOT)/hf_cache
 export UV_PROJECT_ENVIRONMENT ?= .venv
