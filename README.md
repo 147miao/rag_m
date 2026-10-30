@@ -28,3 +28,17 @@ docs/            方案与决策记录
 
 - [方案 v0.2](docs/00-proposal.md)
 - 待补：ARCHITECTURE.md / EVAL_REPORT.md / DECISIONS.md
+
+## 前端（web/）
+
+```bash
+cd web
+pnpm install
+pnpm dev          # http://127.0.0.1:5173
+pnpm build        # 产物 web/dist
+```
+
+- 设计规范：[web/DESIGN.md](web/DESIGN.md)（遵循 OpenDesign 的 DESIGN.md 协议：色板 / 字体 / 间距 / 组件 / 状态 / 动效 / 无障碍）
+- 演示深链：`?demo=multihop-1&tab=graph&fast=1`（demo = simple-1 / multihop-1 / agentic-1 / refusal-1；tab = evidence / graph / trace / debug；fast=1 直接呈现终态）
+- 当前为**演示数据**，接口契约见 `web/src/lib/types.ts`，后端接入后由 `/api/query` 返回同结构 JSON
+- 截图：[docs/screenshots](docs/screenshots)

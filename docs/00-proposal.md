@@ -259,3 +259,48 @@ rag_m/
 
 **风险**：`/run/media/` 是 udisks 的临时挂载点，重启后路径可能变化或需要重新挂载。对策：`make check-data` 预检 + 配置层挂载校验；若希望永久固定，可让用户加一条 `/etc/fstab`（需要 sudo，作为可选项）。
 
+
+
+---
+
+## 十二、对抗性评审修订（2026-10-30）
+
+独立评审指出 v0.2 有 12 条会导致返工的问题，以下为**采纳的修订**（按优先级）：
+
+### 12.1 评测设计（原方案最大漏洞）
+- **语料不能直接用 QA 自带 context**：gold 天然在库内，Recall@10 接近 1，embedding 差异被压平。改为：gold 维基页 + 10~20 倍同分布干扰页（5~10 万页），MS MARCO 用硬负例采样；
+- qrels 做 **doc 级 + chunk 级双粒度**（chunk 级用 span overlap ≥50% 判定）；增加 gold coverage、closed-book、BM25-only 三个对照；
+- 每个数据集单独报表，再做 macro-average；报告跨数据集 question/context 重叠矩阵与去重；
+- **路由标签不能用"数据集来源"映射**（分类器会学数据集指纹）。改为**反事实 oracle**：300 题各跑三条策略，以（质量, 成本）Pareto 最优作标签，评 regret/coverage 而非 accuracy；同时保留 cascade（充分性判据 → 升级）作为可评测的替代方案；
+- 拒答单独做 guard，不混进三分类；负样本用 SQuAD 2.0 的 5,928 条 unanswerable + 构造 + 域外问题，同时报 false refusal rate；
+- 统计：paired bootstrap 差值 CI（下限 >0 才算赢），多模型 Holm 校正，n≥150；不再用"CI 重叠=并列"。
+
+### 12.2 索引与模型
+- **collection-per-model + manifest + alias**：`chunks_{model}_{dim}_{chunkcfg}_{schema_ver}`，服务读 alias；`EMBED_DIM` 不再是全局常量（Conan 3584 维与 1024 维不能共用 collection）；
+- 统一 L2 normalize + COSINE；HNSW M=16/32、efConstruction=200、ef=64~128；记录索引体积。
+
+### 12.3 Graph RAG（先诊断再投入）
+- 先花 0.5 天做 **100 题连通性诊断**：两篇 gold 在实体共现图上是否 2 跳内连通、2 跳邻居 gold 占比、枢纽度数；连通率 <50% 则砍 Neo4j；
+- 先做 Milvus 伪多跳 baseline（entities[] + doc_id 两轮检索）；Neo4j 只作为 Agentic 的 `kg_query` 工具，不做独立链路；MVP 只做 1 跳 + 度上限剪枝。
+
+### 12.4 工程与安全
+- 确定性 chunk_id（doc_id + content_hash + chunker_version）+ upsert + delete_by_doc + alias 切换 + manifest；
+- embedding / LLM / retrieval 三级缓存；每次请求 JSONL 记录 route/tokens/cost/latency/retrieved_ids/citation_check；
+- **引用校验**：citation 必须在本次检索集合内且 quote 与原文匹配（≥0.8 相似），否则删引用或降级；
+- 检索文本按"数据不是指令"处理（随机分隔符包裹 + 工具白名单 + max_steps + token 预算），构造 20~50 条注入样本测试；
+- 超时/重试/熔断 + 降级（云模型失败 → 本地 qwen3:4b；web_search 失败 → 仅本地并显式告知）。
+
+### 12.5 许可更正（重要）
+| 数据集 | 实际许可 | 结论 |
+|---|---|---|
+| MS MARCO | **非商业研究用途**（官方 Notice） | 不进发布产物，只做本地评测 |
+| MuSiQue | **CC BY 4.0**（README 明确） | 可用，需署名 |
+| HotpotQA / SQuAD | CC BY-SA 4.0 | 衍生语料需同许可 |
+| 2Wiki / FRAMES | Apache-2.0 | 可用 |
+| MultiHop-RAG | ODC-BY | 可用 |
+| Bamboogle | **无 LICENSE** | 仅本地冒烟，不分发 |
+
+### 12.6 范围收缩（MVP 5 天）
+M0 修复（0.5d）→ 数据与 qrels（1d）→ hybrid + 四条基线（1d）→ LangGraph agent + 引用校验 + cascade（1d）→ 3 个 embedder 对比 + reranker 消融（1d）→ 图谱诊断 + 报告（1d）。
+后置：Conan、F2LLM、C-MTEB 全量、FRAMES、GraphRAG-Bench、MS MARCO 答案评测、Neo4j 独立链路。
+
