@@ -1,0 +1,10 @@
+Loading weights:   0%|          | 0/314 [00:00<?, ?it/s]Loading weights:  69%|██████▉   | 217/314 [00:00<00:00, 2169.69it/s]Loading weights: 100%|██████████| 314/314 [00:00<00:00, 2905.94it/s]
+{"recall@5": 0.96, "recall@10": 0.96, "ndcg@10": 0.9375, "mrr@10": 0.93, "recall@20": 0.96, "chunk_size": 200, "overlap": 40, "mode": "dense", "chunks": 8774, "avg_chars": 166.6, "ingest_s": 54.6}
+{"recall@5": 0.99, "recall@10": 0.99, "ndcg@10": 0.9678, "mrr@10": 0.9603, "recall@20": 1.0, "chunk_size": 200, "overlap": 40, "mode": "hybrid", "chunks": 8774, "avg_chars": 166.6, "ingest_s": 54.6}
+{"recall@5": 0.92, "recall@10": 0.93, "ndcg@10": 0.9115, "mrr@10": 0.9053, "recall@20": 0.93, "chunk_size": 400, "overlap": 80, "mode": "dense", "chunks": 4467, "avg_chars": 308.0, "ingest_s": 67.8}
+{"recall@5": 0.99, "recall@10": 0.99, "ndcg@10": 0.9609, "mrr@10": 0.9508, "recall@20": 0.99, "chunk_size": 400, "overlap": 80, "mode": "hybrid", "chunks": 4467, "avg_chars": 308.0, "ingest_s": 67.8}
+{"recall@5": 0.94, "recall@10": 0.94, "ndcg@10": 0.9182, "mrr@10": 0.9108, "recall@20": 0.94, "chunk_size": 800, "overlap": 160, "mode": "dense", "chunks": 2651, "avg_chars": 474.9, "ingest_s": 62.7}
+{"recall@5": 1.0, "recall@10": 1.0, "ndcg@10": 0.9662, "mrr@10": 0.955, "recall@20": 1.0, "chunk_size": 800, "overlap": 160, "mode": "hybrid", "chunks": 2651, "avg_chars": 474.9, "ingest_s": 62.7}
+{"recall@5": 0.93, "recall@10": 0.93, "ndcg@10": 0.9165, "mrr@10": 0.912, "recall@20": 0.93, "chunk_size": 1600, "overlap": 320, "mode": "dense", "chunks": 2403, "avg_chars": 507.4, "ingest_s": 58.8}
+{"recall@5": 1.0, "recall@10": 1.0, "ndcg@10": 0.9639, "mrr@10": 0.9517, "recall@20": 1.0, "chunk_size": 1600, "overlap": 320, "mode": "hybrid", "chunks": 2403, "avg_chars": 507.4, "ingest_s": 58.8}
+saved reports/chunk_size_benchmark.json
