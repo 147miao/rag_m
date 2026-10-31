@@ -132,6 +132,7 @@ export function RightPanel({
               {
                 route: scenario.route,
                 confidence: scenario.confidence,
+                classifier: scenario.classifier,
                 stats: scenario.stats,
                 citations: scenario.citations,
                 evidence: scenario.evidence.map((e) => ({ id: e.id, score: e.score, dense: e.dense, sparse: e.sparse })),

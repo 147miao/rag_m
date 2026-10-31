@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from .. import __version__
 from ..config import get_settings
 from .schemas import (
+    ClassifierInfo,
     DoneEvent,
     ErrorBody,
     ErrorResponse,
@@ -24,6 +25,8 @@ from .schemas import (
     HealthResponse,
     QueryRequest,
     QueryResponse,
+    RouteRequest,
+    RouteResponse,
     ScenarioSummary,
     StageEvent,
     TokenEvent,
@@ -34,6 +37,15 @@ router = APIRouter(prefix="/api", tags=["rag"])
 
 def _service(request: Request):
     return request.app.state.service
+
+
+def _classifier(request: Request):
+    return request.app.state.classifier
+
+
+def _classify(request: Request, question: str) -> ClassifierInfo:
+    decision = _classifier(request).classify(question)
+    return ClassifierInfo(**decision.as_dict())
 
 
 # ---------- health ----------
@@ -81,6 +93,11 @@ async def health(request: Request) -> HealthResponse:
             ),
         )
     )
+    try:
+        info = _classifier(request).info()
+        checks["classifier"] = HealthCheck(ok=True, detail=str(info.get("backend", "?")))
+    except Exception as exc:  # noqa: BLE001
+        checks["classifier"] = HealthCheck(ok=False, detail=type(exc).__name__)
     status = "ok" if all(c.ok for c in checks.values()) else "degraded"
     return HealthResponse(
         status=status,
@@ -97,9 +114,21 @@ async def list_scenarios(request: Request) -> list[ScenarioSummary]:
 
 
 # ---------- query ----------
+@router.post("/route", response_model=RouteResponse, summary="只做查询路由分类")
+async def route(req: RouteRequest, request: Request) -> RouteResponse:
+    return RouteResponse(**_classify(request, req.question).model_dump())
+
+
 @router.post("/query", response_model=QueryResponse, summary="执行一次 RAG 查询")
 async def query(req: QueryRequest, request: Request) -> QueryResponse:
-    return await _service(request).query(req)
+    classifier_info = None
+    if req.route_override == "auto":
+        classifier_info = _classify(request, req.question)
+        req = req.model_copy(update={"route_override": classifier_info.route})
+    resp = await _service(request).query(req)
+    if classifier_info is not None:
+        resp.classifier = classifier_info
+    return resp
 
 
 def _sse(event: str, data: str) -> str:

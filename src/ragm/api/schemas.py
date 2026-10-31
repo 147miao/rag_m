@@ -90,6 +90,23 @@ class Stats(APIModel):
     citation_check: str
 
 
+class ClassifierInfo(APIModel):
+    backend: str
+    label: Literal["simple", "multihop", "reasoning"]
+    route: Route
+    confidence: float = Field(ge=0, le=1)
+    latency_ms: float = Field(ge=0)
+    reason: str = ""
+
+
+class RouteRequest(APIModel):
+    question: str = Field(min_length=1, max_length=2000)
+
+
+class RouteResponse(ClassifierInfo):
+    pass
+
+
 class QueryRequest(APIModel):
     question: str = Field(min_length=1, max_length=2000, description="用户问题")
     route_override: RouteOverride = Field(default="auto", description="auto 表示由分类器决定")
@@ -111,6 +128,7 @@ class QueryResponse(APIModel):
     graph: GraphPayload | None = None
     stats: Stats
     refusal: Refusal | None = None
+    classifier: ClassifierInfo | None = None
     served_by: ServedBy = "demo"
     generated_at: datetime
 

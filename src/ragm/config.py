@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     embed_batch_size: int = 16
     rerank_model: str = "Qwen/Qwen3-Reranker-0.6B"
 
+    # ---- classifier ----
+    classifier_backend: str = "rules"  # rules | prompt | lora
+    classifier_run_dir: Path | None = None
+    classifier_threshold: float = 0.6
+
     # ---- retrieval ----
     top_k_dense: int = 50
     top_k_sparse: int = 50

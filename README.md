@@ -55,7 +55,8 @@ make test-api   # 契约测试（8 条，不依赖 Milvus/Ollama）
 |---|---|---|
 | GET | `/api/health` | 健康检查：Milvus 连接、Ollama 模型就绪、版本、uptime |
 | GET | `/api/scenarios` | 演示案例列表（id / question / route / confidence / title） |
-| POST | `/api/query` | 一次性查询，返回完整 `QueryResponse` |
+| POST | `/api/route` | 只做查询路由分类（label / route / confidence / backend / latency） |
+| POST | `/api/query` | 一次性查询；`route_override=auto` 时先调用分类器，响应带 `classifier` 元数据 |
 | POST | `/api/query/stream` | SSE 流式：`stage`（阶段进度）→ `token`（增量文本）→ `done`（完整响应） |
 | POST | `/api/feedback` | 答案反馈，落盘 `logs/feedback.jsonl` |
 

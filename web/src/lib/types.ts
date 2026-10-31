@@ -42,6 +42,15 @@ export interface GraphEdge {
   label: string
 }
 
+export interface ClassifierInfo {
+  backend: string
+  label: 'simple' | 'multihop' | 'reasoning'
+  route: Route
+  confidence: number
+  latency_ms: number
+  reason?: string
+}
+
 export interface Stats {
   latencyMs: number
   tokensIn: number
@@ -64,6 +73,7 @@ export interface Scenario {
   tools?: ToolCall[]
   graph?: { nodes: GraphNode[]; edges: GraphEdge[] }
   stats: Stats
+  classifier?: ClassifierInfo
   refusal?: { title: string; reason: string; suggestion: string }
 }
 

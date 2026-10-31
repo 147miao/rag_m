@@ -50,6 +50,11 @@ export function AnswerCard({
       <header className="flex flex-wrap items-center gap-2.5 border-b px-5 py-3" style={{ borderColor: 'var(--color-line)' }}>
         <RouteBadge route={scenario.route} confidence={scenario.confidence} />
         <span className="text-[11px] text-muted">{meta.desc}</span>
+        {scenario.classifier && (
+          <span className="num rounded-full border px-2 py-[2px] text-[9.5px] text-muted" style={{ borderColor: 'var(--color-line)' }}>
+            分类器 {scenario.classifier.backend} · {scenario.classifier.confidence.toFixed(2)}
+          </span>
+        )}
         <span className="num ml-auto text-[10.5px] text-muted">{fmtMs(scenario.stats.latencyMs)}</span>
         <span className="num text-[10.5px] text-faint">{fmtCost(scenario.stats.costCny)}</span>
       </header>

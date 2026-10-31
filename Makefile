@@ -9,13 +9,18 @@ export UV_PROJECT_ENVIRONMENT ?= .venv
 UV ?= uv
 COMPOSE ?= docker compose -f docker/compose.yaml
 
-.PHONY: help check-data venv install up up-graph up-all down ps health api web test test-api fmt lint clean
+.PHONY: help mount-data check-data venv install up up-graph up-all down ps health api web test test-api fmt lint clean
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
 
-check-data: ## 校验 D 盘挂载与目录
-	@mountpoint -q $(DATA_ROOT)/.. && echo "OK: $(DATA_ROOT) 已挂载" || (echo "ERROR: D 盘未挂载"; exit 1)
+DATA_DEVICE ?= /dev/nvme0n1p5
+
+mount-data: ## 挂载 D 盘（udisksctl，无需 sudo；重启/拔出后需要重新挂载）
+	@mountpoint -q $(DATA_ROOT) && echo "OK: $(DATA_ROOT) 已挂载" || (udisksctl mount -b $(DATA_DEVICE) && echo "mounted $(DATA_DEVICE)")
+
+check-data: mount-data ## 校验 D 盘挂载与目录
+	@mountpoint -q $(DATA_ROOT) && echo "OK: $(DATA_ROOT) 已挂载" || (echo "ERROR: D 盘未挂载，先执行 make mount-data"; exit 1)
 	@mkdir -p $(DATA_ROOT)/data/raw $(DATA_ROOT)/data/processed $(DATA_ROOT)/data/corpus $(DATA_ROOT)/models $(DATA_ROOT)/hf_cache $(DATA_ROOT)/milvus_volumes $(DATA_ROOT)/neo4j_data
 	@df -h $(DATA_ROOT) | tail -1
 

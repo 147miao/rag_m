@@ -23,6 +23,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import __version__
+from ..classifier.factory import build_classifier
 from ..config import get_settings
 from ..rag.service import DemoRagService
 from .routes import router
@@ -49,6 +50,7 @@ def _write_log(record: dict) -> None:
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.started_at = time.monotonic()
     app.state.service = DemoRagService()
+    app.state.classifier = build_classifier()
     settings = get_settings()
     logger.info(
         "ragm api ready | backend=demo | milvus=%s | llm=%s",
@@ -70,6 +72,7 @@ def create_app() -> FastAPI:
     # 测试与无 lifespan 场景的默认状态
     app.state.started_at = time.monotonic()
     app.state.service = DemoRagService()
+    app.state.classifier = build_classifier()
 
     app.add_middleware(
         CORSMiddleware,

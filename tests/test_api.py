@@ -20,7 +20,7 @@ async def test_health(client: AsyncClient) -> None:
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] in {"ok", "degraded"}
-    assert set(body["checks"]) == {"milvus", "ollama"}
+    assert {"milvus", "ollama", "classifier"} <= set(body["checks"])
     assert "version" in body
 
 
@@ -72,6 +72,23 @@ async def test_query_validation(client: AsyncClient) -> None:
     assert resp.status_code == 422
     body = resp.json()
     assert body["error"]["code"] == "validation_error"
+
+
+async def test_route_endpoint(client: AsyncClient) -> None:
+    resp = await client.post("/api/route", json={"question": "对比 bge-m3 与 Qwen3 的优劣并给建议"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["label"] in {"simple", "multihop", "reasoning"}
+    assert body["route"] in {"simple", "multihop", "agentic"}
+    assert 0 <= body["confidence"] <= 1
+
+
+async def test_query_auto_uses_classifier(client: AsyncClient) -> None:
+    resp = await client.post("/api/query", json={"question": "Milvus 的 HNSW 默认 M 是多少？"})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["classifier"] is not None
+    assert body["route"] == body["classifier"]["route"]
 
 
 async def test_feedback(client: AsyncClient) -> None:
