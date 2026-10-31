@@ -193,3 +193,28 @@ class DoneEvent(APIModel):
     """SSE: event=done，完整响应。"""
 
     response: QueryResponse
+
+# ---------- search ----------
+
+class SearchRequest(APIModel):
+    query: str = Field(min_length=1, max_length=1000)
+    k: int = Field(default=10, ge=1, le=50)
+    mode: Literal["dense", "sparse", "hybrid"] = "hybrid"
+
+
+class SearchHit(APIModel):
+    chunk_id: str
+    doc_id: str
+    title: str
+    source: str
+    lang: str
+    chunk_index: int = 0
+    score: float
+    text: str
+
+
+class SearchResponse(APIModel):
+    query: str
+    mode: str
+    latency_ms: float
+    hits: list[SearchHit]

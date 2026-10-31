@@ -26,6 +26,7 @@ from .. import __version__
 from ..classifier.factory import build_classifier
 from ..config import get_settings
 from ..rag.service import DemoRagService
+from ..store.search_service import SearchService
 from .routes import router
 from .schemas import ErrorBody, ErrorResponse
 
@@ -51,7 +52,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.started_at = time.monotonic()
     app.state.service = DemoRagService()
     app.state.classifier = build_classifier()
+    app.state.search = None
     settings = get_settings()
+    try:
+        app.state.search = SearchService(settings)
+        logger.info("search service ready: %s", app.state.search.info())
+    except Exception:  # noqa: BLE001
+        app.state.search = None
+        logger.warning("search service unavailable (embedding model / milvus)", exc_info=True)
     logger.info(
         "ragm api ready | backend=demo | milvus=%s | llm=%s",
         settings.milvus_uri,

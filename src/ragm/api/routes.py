@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from .. import __version__
@@ -17,6 +17,8 @@ from ..config import get_settings
 from ..ops.status import collect_status
 from .schemas import (
     ClassifierInfo,
+    SearchRequest,
+    SearchResponse,
     DoneEvent,
     ErrorBody,
     ErrorResponse,
@@ -116,6 +118,16 @@ async def status() -> dict:
         return collect_status()
     except Exception as exc:  # noqa: BLE001
         return {"error": type(exc).__name__, "detail": str(exc)[:300]}
+
+
+# ---------- search ----------
+@router.post("/search", response_model=SearchResponse, summary="混合检索（dense / BM25 / hybrid）")
+async def search(req: SearchRequest, request: Request) -> SearchResponse:
+    svc = getattr(request.app.state, "search", None)
+    if svc is None:
+        raise HTTPException(status_code=503, detail="search service not ready (embedding model / milvus)")
+    res = await asyncio.to_thread(svc.search, req.query, req.k, req.mode)
+    return SearchResponse(**res)
 
 
 # ---------- scenarios ----------

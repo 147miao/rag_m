@@ -31,9 +31,11 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
 
     # ---- embeddings ----
-    embed_model: str = "BAAI/bge-m3"
-    embed_dim: int = 1024
-    embed_batch_size: int = 16
+    embed_model: str = "google/embeddinggemma-300m"
+    embed_dim: int = 768
+    embed_batch_size: int = 32
+    embed_model_path: Path | None = None
+    embed_max_len: int = 512
     rerank_model: str = "Qwen/Qwen3-Reranker-0.6B"
 
     # ---- classifier ----
