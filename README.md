@@ -58,7 +58,7 @@ make test-api   # 契约测试（8 条，不依赖 Milvus/Ollama）
 | POST | `/api/route` | 只做查询路由分类（label / route / confidence / backend / latency） |
 | POST | `/api/query` | 一次性查询；`route_override=auto` 时先调用分类器，响应带 `classifier` 元数据 |
 | POST | `/api/query/stream` | SSE 流式：`stage`（阶段进度）→ `token`（增量文本）→ `done`（完整响应） |
-| POST | `/api/search` | 混合检索（dense / BM25 / hybrid），返回 top-k chunk |
+| POST | `/api/search` | 检索（dense / BM25 / hybrid / **small2big**），返回 top-k chunk 或 parent 上下文 |
 | POST | `/api/feedback` | 答案反馈，落盘 `logs/feedback.jsonl` |
 
 ```bash
@@ -77,5 +77,6 @@ curl -N -X POST http://127.0.0.1:8000/api/query/stream \
 - 路由分类器：`src/ragm/classifier/`（rules / prompt-llm / lora 三种后端）；当前默认 `CLASSIFIER_BACKEND=lora` + `CLASSIFIER_RUN_DIR=models/classifier/s1_06b_plain`（Qwen3-0.6B + SEQ_CLS LoRA，test_human macro-F1 0.898，36ms/条）
 - 进度监控：`make status`（或 `python scripts/status.py --watch 10`）、`GET /api/status`、前端顶栏训练徽章
 - 检索索引：Milvus collection `rag_chunks`（40,019 chunks；embeddinggemma-300m 768 维 + BM25 sparse），详见 [docs/06-milvus-retrieval.md](docs/06-milvus-retrieval.md)
+- Small-to-big：`rag_children`（46,142 child）+ `parents.jsonl`（39,771 parent），`mode=small2big`；长文档 coverage 0.70→0.99，详见 [docs/08-small2big.md](docs/08-small2big.md)
 - 请求日志：`logs/api.jsonl`（request_id / method / path / status / elapsed_ms）
 - 前端 dev 模式经 Vite 代理 `/api` → `127.0.0.1:8000`；`pnpm build` 后由 FastAPI 直接托管 `web/dist`

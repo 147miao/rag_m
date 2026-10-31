@@ -199,11 +199,12 @@ class DoneEvent(APIModel):
 class SearchRequest(APIModel):
     query: str = Field(min_length=1, max_length=1000)
     k: int = Field(default=10, ge=1, le=50)
-    mode: Literal["dense", "sparse", "hybrid"] = "hybrid"
+    mode: Literal["dense", "sparse", "hybrid", "small2big"] = "hybrid"
 
 
 class SearchHit(APIModel):
-    chunk_id: str
+    chunk_id: str = ""
+    parent_id: str = ""
     doc_id: str
     title: str
     source: str
@@ -211,6 +212,7 @@ class SearchHit(APIModel):
     chunk_index: int = 0
     score: float
     text: str
+    child_text: str = ""
 
 
 class SearchResponse(APIModel):

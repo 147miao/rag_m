@@ -126,7 +126,10 @@ async def search(req: SearchRequest, request: Request) -> SearchResponse:
     svc = getattr(request.app.state, "search", None)
     if svc is None:
         raise HTTPException(status_code=503, detail="search service not ready (embedding model / milvus)")
-    res = await asyncio.to_thread(svc.search, req.query, req.k, req.mode)
+    if req.mode == "small2big":
+        res = await asyncio.to_thread(svc.search_small2big, req.query, req.k)
+    else:
+        res = await asyncio.to_thread(svc.search, req.query, req.k, req.mode)
     return SearchResponse(**res)
 
 

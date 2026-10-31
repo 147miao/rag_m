@@ -1,0 +1,7 @@
+docs: 996 | avg chars 1345
+Loading weights:   0%|          | 0/314 [00:00<?, ?it/s]Loading weights:  84%|████████▍ | 263/314 [00:00<00:00, 2616.17it/s]Loading weights: 100%|██████████| 314/314 [00:00<00:00, 2863.58it/s]
+baseline indexed 2382 chunks in 27s
+child indexed 8872 chunks in 22s
+{"n": 100, "doc_hit@8": 0.97, "evidence_coverage@8": 0.7, "avg_context_chars": 5543.0, "mode": "baseline", "p50_ms": 28.6}
+{"n": 100, "doc_hit@8": 0.94, "evidence_coverage@8": 0.99, "avg_context_chars": 11340.8, "mode": "small2big", "p50_ms": 29.0}
+saved reports/small2big_long.json
