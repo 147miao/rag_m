@@ -1,6 +1,14 @@
+import type { HealthResponse } from '../lib/api'
 import { Icon } from './ui'
 
-export function TopBar() {
+export type ApiMode = 'connecting' | 'live' | 'demo'
+
+export function TopBar({ apiMode, health }: { apiMode: ApiMode; health: HealthResponse | null }) {
+  const milvusOk = health?.checks.milvus?.ok ?? false
+  const ollamaOk = health?.checks.ollama?.ok ?? false
+  const modeLabel = apiMode === 'live' ? 'API live' : apiMode === 'connecting' ? '连接中' : '演示模式'
+  const modeColor = apiMode === 'live' ? 'var(--color-success)' : apiMode === 'connecting' ? 'var(--color-faint)' : 'var(--color-amber)'
+
   return (
     <header className="sticky top-0 z-30 border-b bg-paper/85 backdrop-blur-[6px]" style={{ borderColor: 'var(--color-line)' }}>
       <div className="mx-auto flex h-14 max-w-[1560px] items-center gap-6 px-6">
@@ -16,19 +24,24 @@ export function TopBar() {
         </div>
 
         <div className="ml-auto flex items-center gap-4">
-          <span className="hidden items-center gap-1.5 text-[11.5px] text-muted lg:flex">
-            <span className="h-1.5 w-1.5 rounded-full bg-success" />
-            Milvus 3.0.4 · 已连接
+          <span className="hidden items-center gap-1.5 text-[11.5px] text-muted lg:flex" title={health ? JSON.stringify(health.checks) : '等待健康检查'}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: milvusOk ? 'var(--color-success)' : 'var(--color-danger)' }} />
+            Milvus {milvusOk ? '已连接' : '未连接'}
           </span>
           <span className="hidden items-center gap-1.5 text-[11.5px] text-muted lg:flex">
             <Icon name="cpu" size={13} />
             gemma4:31b-cloud
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: ollamaOk ? 'var(--color-success)' : 'var(--color-danger)' }} />
+          </span>
+          <span className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10.5px]" style={{ borderColor: 'var(--color-line)' }}>
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: modeColor }} />
+            {modeLabel}
           </span>
           <button
             type="button"
             className="flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-[12px] text-ink-2 transition-colors hover:bg-surface-2"
             style={{ borderColor: 'var(--color-line)' }}
-            title="设置（演示占位）"
+            title="设置（占位）"
           >
             <Icon name="layers" size={14} />
             设置

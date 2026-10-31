@@ -145,7 +145,7 @@ export function RightPanel({
       </div>
 
       <footer className="border-t px-3 py-2 text-[10.5px] text-faint" style={{ borderColor: 'var(--color-line)' }}>
-        演示数据 · 接入后端后由 <span className="num">/api/query</span> 返回同结构 JSON
+        数据经 <span className="num">/api/query</span> 返回 · 当前 served_by=demo
       </footer>
     </aside>
   )

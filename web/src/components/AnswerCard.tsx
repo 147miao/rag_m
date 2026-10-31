@@ -88,20 +88,28 @@ export function AnswerCard({
           </div>
         )}
 
-        {showBody && !scenario.refusal && (
-          <div className="mt-4">
-            <div className="font-serif text-[20px] leading-[1.45] tracking-[-0.01em] text-ink" aria-live="polite">
-              {renderWithCitations(streamed.split('\n\n')[0] ?? '', onCite)}
-              {phase === 'streaming' && !streamed.includes('\n\n') && <span className="stream-caret" />}
-            </div>
-            {streamed.includes('\n\n') && (
-              <div className="mt-3 text-[13.5px] leading-[1.75] text-ink-2">
-                {renderWithCitations(streamed.split('\n\n').slice(1).join('\n\n'), onCite)}
-                {phase === 'streaming' && <span className="stream-caret" />}
+        {showBody && !scenario.refusal && (() => {
+          // 流式阶段用增量文本；完成后用服务端返回的完整答案（SSE done / POST /api/query）
+          const text =
+            phase === 'streaming'
+              ? streamed
+              : scenario.answer.lead + (scenario.answer.body ? '\n\n' + scenario.answer.body : '')
+          const [lead, ...rest] = text.split('\n\n')
+          return (
+            <div className="mt-4">
+              <div className="font-serif text-[20px] leading-[1.45] tracking-[-0.01em] text-ink" aria-live="polite">
+                {renderWithCitations(lead ?? '', onCite)}
+                {phase === 'streaming' && rest.length === 0 && <span className="stream-caret" />}
               </div>
-            )}
-          </div>
-        )}
+              {rest.length > 0 && (
+                <div className="mt-3 text-[13.5px] leading-[1.75] text-ink-2">
+                  {renderWithCitations(rest.join('\n\n'), onCite)}
+                  {phase === 'streaming' && <span className="stream-caret" />}
+                </div>
+              )}
+            </div>
+          )
+        })()}
 
         {showBody && (
           <div className="mt-5 flex flex-wrap items-center gap-2 border-t pt-3" style={{ borderColor: 'var(--color-line)' }}>

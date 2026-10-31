@@ -42,3 +42,35 @@ pnpm build        # 产物 web/dist
 - 演示深链：`?demo=multihop-1&tab=graph&fast=1`（demo = simple-1 / multihop-1 / agentic-1 / refusal-1；tab = evidence / graph / trace / debug；fast=1 直接呈现终态）
 - 当前为**演示数据**，接口契约见 `web/src/lib/types.ts`，后端接入后由 `/api/query` 返回同结构 JSON
 - 截图：[docs/screenshots](docs/screenshots)
+
+## 后端（FastAPI）
+
+```bash
+make api        # http://127.0.0.1:8000（生产模式）
+make api-dev    # 热重载
+make test-api   # 契约测试（8 条，不依赖 Milvus/Ollama）
+```
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/api/health` | 健康检查：Milvus 连接、Ollama 模型就绪、版本、uptime |
+| GET | `/api/scenarios` | 演示案例列表（id / question / route / confidence / title） |
+| POST | `/api/query` | 一次性查询，返回完整 `QueryResponse` |
+| POST | `/api/query/stream` | SSE 流式：`stage`（阶段进度）→ `token`（增量文本）→ `done`（完整响应） |
+| POST | `/api/feedback` | 答案反馈，落盘 `logs/feedback.jsonl` |
+
+```bash
+curl -s http://127.0.0.1:8000/api/health
+curl -s -X POST http://127.0.0.1:8000/api/query \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"Milvus 的 BM25 Function 是什么？","route_override":"auto"}'
+curl -N -X POST http://127.0.0.1:8000/api/query/stream \
+  -H 'Content-Type: application/json' \
+  -d '{"question":"bge-m3 是哪个机构发布的？"}'
+```
+
+- OpenAPI 文档：<http://127.0.0.1:8000/docs>
+- 契约定义：`src/ragm/api/schemas.py` ↔ `web/src/lib/types.ts`（字段一一对应；`Stats` 用 camelCase 别名序列化）
+- 服务层抽象：`src/ragm/rag/service.py` 定义 `RagService` Protocol；当前 `DemoRagService`（`served_by=demo`），接入 LangGraph 后新增实现即可，API 层不改
+- 请求日志：`logs/api.jsonl`（request_id / method / path / status / elapsed_ms）
+- 前端 dev 模式经 Vite 代理 `/api` → `127.0.0.1:8000`；`pnpm build` 后由 FastAPI 直接托管 `web/dist`

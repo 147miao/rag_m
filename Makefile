@@ -9,7 +9,7 @@ export UV_PROJECT_ENVIRONMENT ?= .venv
 UV ?= uv
 COMPOSE ?= docker compose -f docker/compose.yaml
 
-.PHONY: help check-data venv install up up-graph up-all down ps health test fmt lint clean
+.PHONY: help check-data venv install up up-graph up-all down ps health api web test test-api fmt lint clean
 
 help:
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN{FS=":.*?## "}{printf "  %-14s %s\n", $$1, $$2}'
@@ -43,8 +43,20 @@ ps:
 health: ## 检查 Milvus 健康状态
 	@curl -sf http://127.0.0.1:9091/healthz && echo || echo "Milvus 未就绪"
 
+api: ## 启动 FastAPI（http://127.0.0.1:8000）
+	$(UV) run uvicorn ragm.api.main:app --host 127.0.0.1 --port 8000
+
+api-dev: ## 启动 FastAPI（热重载）
+	$(UV) run uvicorn ragm.api.main:app --host 127.0.0.1 --port 8000 --reload
+
+web: ## 启动前端 dev server（http://127.0.0.1:5173）
+	cd web && pnpm dev
+
 test:
 	$(UV) run pytest -q
+
+test-api: ## 只跑 API 契约测试
+	$(UV) run pytest tests/test_api.py -q
 
 fmt:
 	$(UV) run ruff format src tests scripts
