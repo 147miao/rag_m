@@ -1,0 +1,9 @@
+== qwen3-embedding-0.6b / en ==
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   8%|▊         | 26/310 [00:00<00:01, 258.72it/s]Loading weights:  37%|███▋      | 114/310 [00:00<00:00, 619.75it/s]Loading weights:  65%|██████▌   | 203/310 [00:00<00:00, 738.85it/s]Loading weights:  92%|█████████▏| 286/310 [00:00<00:00, 773.42it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 718.02it/s]
+{"recall@5": 0.7667, "recall@10": 0.8283, "ndcg@10": 0.7872, "mrr@10": 0.9149, "recall@20": 0.8667, "model": "qwen3-embedding-0.6b", "lang": "en", "dim": 1024, "corpus": 37368, "queries": 300, "load_s": 2.36, "encode_s": 1516.8, "docs_per_s": 24.6, "query_encode_s": 2.69, "search_s": 0.06, "peak_vram_gib": 3.31}
+== qwen3-embedding-0.6b / zh ==
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:  30%|██▉       | 92/310 [00:00<00:00, 913.17it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 1575.53it/s]
+{"recall@5": 0.96, "recall@10": 0.96, "ndcg@10": 0.9476, "mrr@10": 0.9448, "recall@20": 0.98, "model": "qwen3-embedding-0.6b", "lang": "zh", "dim": 1024, "corpus": 2403, "queries": 100, "load_s": 0.69, "encode_s": 156.8, "docs_per_s": 15.3, "query_encode_s": 0.59, "search_s": 0.0, "peak_vram_gib": 3.31}
+== reranker / en ==
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:  63%|██████▎   | 195/310 [00:00<00:00, 1947.39it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 2093.96it/s]
+Loading weights:   0%|          | 0/391 [00:00<?, ?it/s]Loading weights:  20%|██        | 79/391 [00:00<00:00, 789.12it/s]Loading weights:  94%|█████████▍| 369/391 [00:00<00:00, 2006.75it/s]Loading weights: 100%|██████████| 391/391 [00:00<00:00, 1872.44it/s]
