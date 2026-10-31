@@ -14,6 +14,7 @@ from fastapi.responses import StreamingResponse
 
 from .. import __version__
 from ..config import get_settings
+from ..ops.status import collect_status
 from .schemas import (
     ClassifierInfo,
     DoneEvent,
@@ -105,6 +106,16 @@ async def health(request: Request) -> HealthResponse:
         uptime_s=round(time.monotonic() - request.app.state.started_at, 1),
         checks=checks,
     )
+
+
+# ---------- status ----------
+@router.get("/status", summary="实验/任务进度")
+async def status() -> dict:
+    """读取训练/评测/数据进度（来自 scripts/status.py 同一采集器）。"""
+    try:
+        return collect_status()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": type(exc).__name__, "detail": str(exc)[:300]}
 
 
 # ---------- scenarios ----------

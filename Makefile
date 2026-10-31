@@ -48,6 +48,9 @@ ps:
 health: ## 检查 Milvus 健康状态
 	@curl -sf http://127.0.0.1:9091/healthz && echo || echo "Milvus 未就绪"
 
+status: ## 打印实验进度看板（--watch 10 可实时刷新）
+	$(UV) run python scripts/status.py $(if $(WATCH),--watch $(WATCH),)
+
 api: ## 启动 FastAPI（http://127.0.0.1:8000）
 	$(UV) run uvicorn ragm.api.main:app --host 127.0.0.1 --port 8000
 

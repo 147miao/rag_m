@@ -1,13 +1,20 @@
-import type { HealthResponse } from '../lib/api'
+import type { HealthResponse, StatusResponse } from '../lib/api'
 import { Icon } from './ui'
 
 export type ApiMode = 'connecting' | 'live' | 'demo'
 
-export function TopBar({ apiMode, health }: { apiMode: ApiMode; health: HealthResponse | null }) {
+export function TopBar({ apiMode, health, status }: { apiMode: ApiMode; health: HealthResponse | null; status?: StatusResponse | null }) {
   const milvusOk = health?.checks.milvus?.ok ?? false
   const ollamaOk = health?.checks.ollama?.ok ?? false
   const modeLabel = apiMode === 'live' ? 'API live' : apiMode === 'connecting' ? '连接中' : '演示模式'
   const modeColor = apiMode === 'live' ? 'var(--color-success)' : apiMode === 'connecting' ? 'var(--color-faint)' : 'var(--color-amber)'
+  const activeRun = status?.runs.find((r) => typeof r.progress?.percent === 'number' && r.progress.percent < 100)
+  const busy = (status?.running.training?.length ?? 0) > 0
+  const busyLabel = busy
+    ? activeRun
+      ? `训练 ${activeRun.name} · ${activeRun.progress?.percent}%`
+      : '训练中'
+    : '空闲'
 
   return (
     <header className="sticky top-0 z-30 border-b bg-paper/85 backdrop-blur-[6px]" style={{ borderColor: 'var(--color-line)' }}>
@@ -33,9 +40,17 @@ export function TopBar({ apiMode, health }: { apiMode: ApiMode; health: HealthRe
             gemma4:31b-cloud
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: ollamaOk ? 'var(--color-success)' : 'var(--color-danger)' }} />
           </span>
-          <span className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10.5px]" style={{ borderColor: 'var(--color-line)' }}>
+          <span className="flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10.5px]" style={{ borderColor: 'var(--color-line)' }} title={status ? `GPU ${status.gpu.used_mib}/${status.gpu.total_mib} MiB · ${status.gpu.util_pct}%` : undefined}>
             <span className="h-1.5 w-1.5 rounded-full" style={{ background: modeColor }} />
             {modeLabel}
+          </span>
+          <span
+            className="hidden items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10.5px] md:flex"
+            style={{ borderColor: 'var(--color-line)' }}
+            title={status?.running.training?.join('\n')}
+          >
+            <span className="h-1.5 w-1.5 rounded-full" style={{ background: busy ? 'var(--color-amber)' : 'var(--color-faint)' }} />
+            {busyLabel}
           </span>
           <button
             type="button"

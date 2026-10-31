@@ -1,0 +1,14 @@
+train=6344 dev=401 arch=seq_cls variant=plain
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   5%|▍         | 14/310 [00:00<00:02, 139.83it/s]Loading weights:  23%|██▎       | 71/310 [00:00<00:00, 389.77it/s]Loading weights:  48%|████▊     | 148/310 [00:00<00:00, 560.13it/s]Loading weights:  76%|███████▌  | 236/310 [00:00<00:00, 681.97it/s]Loading weights:  98%|█████████▊| 305/310 [00:00<00:00, 667.40it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 602.11it/s]
+[transformers] [1mQwen3ForSequenceClassification LOAD REPORT[0m from: /run/media/myj/D/rag_m/models/Qwen3-1.7B
+Key            | Status     | 
+---------------+------------+-
+lm_head.weight | UNEXPECTED | 
+score.weight   | MISSING    | 
+
+Notes:
+- UNEXPECTED:	can be ignored when loading from different task/architecture; not ok if you expect identical arch.
+- MISSING:	those params were newly initialized because missing from the checkpoint. Consider training on your downstream task.
+gradient checkpointing enabled
+trainable params: 17,438,720 || all params: 1,738,019,840 || trainable%: 1.0034
+  0%|          | 0/1191 [00:00<?, ?it/s]  0%|          | 1/1191 [00:02<44:54,  2.26s/it]  0%|          | 2/1191 [00:04<39:12,  1.98s/it]  0%|          | 3/1191 [00:05<36:44,  1.86s/it]  0%|          | 4/1191 [00:07<36:22,  1.84s/it]  0%|          | 5/1191 [00:09<37:25,  1.89s/it]  1%|          | 6/1191 [00:11<36:35,  1.85s/it]  1%|          | 7/1191 [00:13<36:13,  1.84s/it]  1%|          | 8/1191 [00:14<36:12,  1.84s/it]  1%|          | 9/1191 [00:16<37:02,  1.88s/it]  1%|          | 10/1191 [00:18<37:02,  1.88s/it]  1%|          | 11/1191 [00:20<38:00,  1.93s/it]  1%|          | 12/1191 [00:22<38:10,  1.94s/it]  1%|          | 13/1191 [00:25<40:13,  2.05s/it]  1%|          | 14/1191 [00:27<40:25,  2.06s/it]  1%|▏         | 15/1191 [00:29<39:19,  2.01s/it]  1%|▏         | 16/1191 [00:30<38:30,  1.97s/it]  1%|▏         | 17/1191 [00:32<38:41,  1.98s/it]  2%|▏         | 18/1191 [00:35<39:17,  2.01s/it]  2%|▏         | 19/1191 [00:37<39:14,  2.01s/it]  2%|▏         | 20/1191 [00:39<38:49,  1.99s/it]                                                   2%|▏         | 20/1191 [00:39<38:49,  1.99s/it]  2%|▏         | 21/1191 [00:40<38:45,  1.99s/it]  2%|▏         | 22/1191 [00:43<39:11,  2.01s/it]  2%|▏         | 23/1191 [00:45<40:21,  2.07s/it]  2%|▏         | 24/1191 [00:47<42:00,  2.16s/it]  2%|▏         | 25/1191 [00:49<40:17,  2.07s/it]  2%|▏         | 26/1191 [00:51<39:31,  2.04s/it]

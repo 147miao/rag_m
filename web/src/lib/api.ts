@@ -131,3 +131,33 @@ export function sendFeedback(payload: { query_id: string; rating: 'up' | 'down';
     body: JSON.stringify(payload),
   })
 }
+
+export interface TrainingProgress {
+  percent?: number
+  step?: number
+  total_steps?: number
+  eta?: string
+}
+
+export interface RunStatus {
+  name: string
+  arch?: string
+  variant?: string
+  model?: string
+  dev_macro_f1?: number
+  adapter?: boolean
+  evals?: Record<string, { accuracy?: number; macro_f1?: number; p50_ms?: number; test_data?: string }>
+  progress?: TrainingProgress
+}
+
+export interface StatusResponse {
+  generated_at: string
+  gpu: { used_mib: number | null; total_mib: number | null; util_pct: number | null }
+  running: Record<string, string[]>
+  runs: RunStatus[]
+  data: Record<string, number>
+}
+
+export function fetchStatus(signal?: AbortSignal): Promise<StatusResponse> {
+  return request<StatusResponse>('/api/status', { signal })
+}

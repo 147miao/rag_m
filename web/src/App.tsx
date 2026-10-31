@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { scenarios as demoScenarios } from './data/scenarios'
 import type { Route, Scenario } from './lib/types'
 import { ROUTE_META } from './lib/types'
-import { fetchHealth, postQuery, streamQuery, type HealthResponse } from './lib/api'
+import { fetchHealth, fetchStatus, postQuery, streamQuery, type HealthResponse, type StatusResponse } from './lib/api'
 import { AnswerCard } from './components/AnswerCard'
 import { Composer } from './components/Composer'
 import { RightPanel } from './components/RightPanel'
@@ -31,6 +31,7 @@ export default function App() {
   // 后端状态：live = 走 FastAPI SSE；demo = 本地演示动画（后端不可用时降级）
   const [apiMode, setApiMode] = useState<ApiMode>('connecting')
   const [health, setHealth] = useState<HealthResponse | null>(null)
+  const [status, setStatus] = useState<StatusResponse | null>(null)
   const [result, setResult] = useState<Scenario | null>(null)
 
   const localScenario = demoScenarios.find((s) => s.id === activeId) ?? demoScenarios[0]
@@ -63,6 +64,26 @@ export default function App() {
       })
       .catch(() => setApiMode('demo'))
     return () => ctrl.abort()
+  }, [])
+
+  // 轮询实验/训练进度（15s），驱动顶栏进度徽章
+  useEffect(() => {
+    let alive = true
+    const ctrl = new AbortController()
+    const tick = () => {
+      fetchStatus(ctrl.signal)
+        .then((s) => {
+          if (alive) setStatus(s)
+        })
+        .catch(() => {})
+    }
+    tick()
+    const timer = window.setInterval(tick, 15000)
+    return () => {
+      alive = false
+      window.clearInterval(timer)
+      ctrl.abort()
+    }
   }, [])
 
   // 演示深链：?demo=<id>&run=1&tab=graph&fast=1
@@ -214,7 +235,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen">
-      <TopBar apiMode={apiMode} health={health} />
+      <TopBar apiMode={apiMode} health={health} status={status} />
       <div className="mx-auto flex w-full max-w-[1560px]">
         <SideRail scenarios={demoScenarios} activeId={activeId} onSelect={selectScenario} />
 
