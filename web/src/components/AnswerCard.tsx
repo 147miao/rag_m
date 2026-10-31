@@ -51,8 +51,8 @@ export function AnswerCard({
         <RouteBadge route={scenario.route} confidence={scenario.confidence} />
         <span className="text-[11px] text-muted">{meta.desc}</span>
         {scenario.classifier && (
-          <span className="num rounded-full border px-2 py-[2px] text-[9.5px] text-muted" style={{ borderColor: 'var(--color-line)' }}>
-            分类器 {scenario.classifier.backend} · {scenario.classifier.confidence.toFixed(2)}
+          <span className="num rounded-full border px-2 py-[2px] text-[9.5px] text-muted" style={{ borderColor: 'var(--color-line)' }} title={scenario.classifier.backend}>
+            分类器 {scenario.classifier.backend.startsWith('lora') ? 'LoRA' : scenario.classifier.backend} · {scenario.classifier.confidence.toFixed(2)}
           </span>
         )}
         <span className="num ml-auto text-[10.5px] text-muted">{fmtMs(scenario.stats.latencyMs)}</span>

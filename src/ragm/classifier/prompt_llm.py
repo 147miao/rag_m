@@ -7,7 +7,7 @@ import time
 
 import httpx
 
-from .base import Label, RouteDecision
+from .base import RouteDecision
 
 RUBRIC = """你是 RAG 查询路由标注员。把问题分为三类，只输出 JSON：{"label":"simple|multihop|reasoning","confidence":0.0-1.0}
 simple=单段落可答的事实/数值/定义；multihop=需串联两个及以上实体或文档；reasoning=需多源比较/计算/规划/给建议。拿不准按更贵的标。问题："""
@@ -33,7 +33,7 @@ class PromptLLMClassifier:
             resp = client.post(self.base_url + "/api/chat", json=body)
             resp.raise_for_status()
             content = resp.json()["message"]["content"]
-        m = re.search(r"\{.*\}", content, re.S)
+        m = re.search(r"\{.*\}", content, re.DOTALL)
         data = json.loads(m.group(0)) if m else {}
         label = data.get("label")
         if label not in ("simple", "multihop", "reasoning"):

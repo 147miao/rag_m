@@ -17,7 +17,7 @@ TQDM_RE = re.compile(r"(\d+)%\|.*?\|\s*(\d+)/(\d+)\s*\[([^\]]+)\]")
 
 def _pgrep(pattern: str) -> list[str]:
     try:
-        out = subprocess.run(["pgrep", "-af", pattern], capture_output=True, text=True, timeout=5).stdout
+        out = subprocess.run(["pgrep", "-af", pattern], capture_output=True, text=True, timeout=5, check=False).stdout
     except Exception:  # noqa: BLE001
         return []
     return [line for line in out.splitlines() if "pgrep -af" not in line and "status.py" not in line]
@@ -27,7 +27,7 @@ def _gpu() -> dict:
     try:
         out = subprocess.run(
             ["nvidia-smi", "--query-gpu=memory.used,memory.total,utilization.gpu", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=5, check=False,
         ).stdout.strip().splitlines()[0]
         used, total, util = [int(x.strip()) for x in out.split(",")]
         return {"used_mib": used, "total_mib": total, "util_pct": util}

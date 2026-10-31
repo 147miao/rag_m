@@ -41,7 +41,7 @@ def metrics(preds: np.ndarray, golds: np.ndarray, probs: np.ndarray | None = Non
         r = tp / max(1, tp + fn)
         f1s.append(2 * p * r / max(1e-9, p + r))
     out = {
-        "n": int(len(golds)),
+        "n": len(golds),
         "accuracy": acc,
         "macro_f1": float(sum(f1s) / 3),
         "per_class_recall": recalls,

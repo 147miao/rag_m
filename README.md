@@ -73,5 +73,7 @@ curl -N -X POST http://127.0.0.1:8000/api/query/stream \
 - OpenAPI 文档：<http://127.0.0.1:8000/docs>
 - 契约定义：`src/ragm/api/schemas.py` ↔ `web/src/lib/types.ts`（字段一一对应；`Stats` 用 camelCase 别名序列化）
 - 服务层抽象：`src/ragm/rag/service.py` 定义 `RagService` Protocol；当前 `DemoRagService`（`served_by=demo`），接入 LangGraph 后新增实现即可，API 层不改
+- 路由分类器：`src/ragm/classifier/`（rules / prompt-llm / lora 三种后端）；当前默认 `CLASSIFIER_BACKEND=lora` + `CLASSIFIER_RUN_DIR=models/classifier/s1_06b_plain`（Qwen3-0.6B + SEQ_CLS LoRA，test_human macro-F1 0.898，36ms/条）
+- 进度监控：`make status`（或 `python scripts/status.py --watch 10`）、`GET /api/status`、前端顶栏训练徽章
 - 请求日志：`logs/api.jsonl`（request_id / method / path / status / elapsed_ms）
 - 前端 dev 模式经 Vite 代理 `/api` → `127.0.0.1:8000`；`pnpm build` 后由 FastAPI 直接托管 `web/dist`

@@ -22,7 +22,7 @@ class FallbackClassifier:
         if self.primary is not None:
             try:
                 return self.primary.classify(question)
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("primary classifier failed, fallback to rules", exc_info=True)
         return self.fallback.classify(question)
 
@@ -52,7 +52,7 @@ def build_classifier() -> FallbackClassifier:
         else:
             logger.warning("unknown classifier backend %s, using rules", backend)
             primary = RulesClassifier()
-    except Exception:  # noqa: BLE001
+    except Exception:
         logger.exception("failed to build classifier %s, fallback to rules", backend)
         primary = None
     return FallbackClassifier(primary)

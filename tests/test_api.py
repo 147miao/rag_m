@@ -5,10 +5,14 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from ragm.api.main import create_app
+from ragm.config import get_settings
 
 
 @pytest.fixture
-async def client():
+async def client(monkeypatch):
+    # 测试固定用规则分类器，避免依赖 GPU / 已训练 adapter
+    monkeypatch.setenv("CLASSIFIER_BACKEND", "rules")
+    get_settings.cache_clear()
     app = create_app()
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:

@@ -12,12 +12,12 @@ from __future__ import annotations
 
 import argparse
 import json
-import time
 from pathlib import Path
 
 import numpy as np
 import torch
 import torch.nn.functional as F
+from peft import LoraConfig, TaskType, get_peft_model
 from sklearn.metrics import accuracy_score, f1_score
 from torch.utils.data import Dataset
 from transformers import (
@@ -29,7 +29,6 @@ from transformers import (
     TrainingArguments,
     set_seed,
 )
-from peft import LoraConfig, TaskType, get_peft_model
 
 LABELS = ["simple", "multihop", "reasoning"]
 LABEL2ID = {l: i for i, l in enumerate(LABELS)}
@@ -228,7 +227,7 @@ def main() -> None:
         model = get_peft_model(model, lora)
         train_ds = SeqClsDataset(train_rows, tok, args.max_len)
         collator = DataCollatorWithPadding(tok, padding=True)
-        compute_metrics = lambda p: metrics_from_preds(p.predictions.argmax(-1), p.label_ids)  # noqa: E731
+        compute_metrics = lambda p: metrics_from_preds(p.predictions.argmax(-1), p.label_ids)
         trainer_cls = WeightedTrainer
     else:
         model = AutoModelForCausalLM.from_pretrained(args.model, dtype=torch.bfloat16, device_map={"": 0})
@@ -318,7 +317,7 @@ def main() -> None:
     model.save_pretrained(str(out / "adapter"))
     tok.save_pretrained(str(out / "adapter"))
 
-    dev_preds, dev_probs = (
+    dev_preds, _dev_probs = (
         predict_seq_cls(model, tok, dev_rows, args.max_len)
         if args.arch == "seq_cls"
         else predict_gen(model, tok, dev_rows, args.max_len)

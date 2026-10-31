@@ -47,7 +47,7 @@ def ask(question: str) -> dict:
     with urllib.request.urlopen(req, timeout=120) as resp:
         data = json.load(resp)
     content = data["message"]["content"]
-    m = re.search(r"\{.*\}", content, re.S)
+    m = re.search(r"\{.*\}", content, re.DOTALL)
     if not m:
         raise ValueError("no json in response: " + content[:200])
     out = json.loads(m.group(0))

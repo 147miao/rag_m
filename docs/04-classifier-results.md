@@ -71,3 +71,39 @@ bash scripts/run_matrix.sh
 python scripts/eval_route_cls.py --run .../s1_06b_plain --data .../test_human.jsonl
 python scripts/baselines.py --data .../test_human.jsonl --train .../train.jsonl
 ```
+
+---
+
+## 七、最终选型（2026-10-31 16:55）
+
+用户确认选用 **s1：Qwen3-0.6B + SEQ_CLS 分类头 + plain LoRA**。
+
+### 7.1 为什么是 s1
+- test_human macro-F1 **0.898**（acc 0.910），在已完成实验中最高；
+- rsLoRA 0.884、PiSSA 0.887 均未超过 plain；bge-m3+逻辑回归 0.856、gemma4 提示词 0.780；
+- 延迟 36ms（p95 41ms）、显存 1.19GB、无 API 成本，适合常驻；
+- 训练成本：单轮约 25 分钟（8 epoch），可复现。
+
+### 7.2 已知短板
+- reasoning 类 recall 0.78（简单/多跳分别 0.92/0.97）；gemma4 在 reasoning 上更差（0.47）；
+- 存在领域偏移：技术类"对比/选型"问题（如"对比 bge-m3 与 Qwen3 的优劣"）可能被判成 simple，
+  因为训练集 reasoning 样本主要来自医学/叙事/新闻多源问题；
+- 后续改进：补充 200~500 条技术领域 reasoning 样本；或两级路由（置信度 <0.85 回退 gemma4）。
+
+### 7.3 接入方式（已生效）
+```bash
+# .env
+CLASSIFIER_BACKEND=lora
+CLASSIFIER_RUN_DIR=/run/media/myj/D/rag_m/models/classifier/s1_06b_plain
+CLASSIFIER_THRESHOLD=0.6
+```
+- `GET /api/health` → `classifier: {ok: true, detail: "lora-Qwen3-0.6B-seq_cls-plain"}`
+- `POST /api/route` → `{label, route, confidence, backend, latency_ms}`，预热后 36~39ms
+- `POST /api/query`（route_override=auto）→ 响应带 `classifier` 元数据
+- 前端路由徽章旁显示「分类器 LoRA · 0.95」
+- 失败降级：模型加载失败/推理异常自动回退规则分类器（`FallbackClassifier`）
+
+### 7.4 验证
+- API 抽样 120 条 test_human：准确率 0.908，平均置信度 0.945（与离线评测一致）；
+- 10 条 API 契约测试通过（测试环境固定用 rules，避免依赖 GPU）；
+- ruff 全绿。

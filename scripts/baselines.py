@@ -69,7 +69,7 @@ def llm_predict(question: str) -> int:
     req = urllib.request.Request(OLLAMA + "/api/chat", data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
     with urllib.request.urlopen(req, timeout=120) as resp:
         content = json.load(resp)["message"]["content"]
-    m = re.search(r"\{.*\}", content, re.S)
+    m = re.search(r"\{.*\}", content, re.DOTALL)
     if not m:
         return 0
     label = json.loads(m.group(0)).get("label")
