@@ -43,7 +43,6 @@ class DemoRagService:
 
     # ---------- 选择案例 ----------
     def _pick(self, req: QueryRequest) -> dict:
-        by_id = {s["id"]: s for s in DEMO_SCENARIOS}
         if req.route_override != "auto":
             for s in DEMO_SCENARIOS:
                 if s["route"] == req.route_override:
@@ -60,7 +59,7 @@ class DemoRagService:
         for s in DEMO_SCENARIOS:
             if s["route"] == route and not s.get("refusal"):
                 return s
-        return DEMO_SCENARIOS[0] if not by_id else DEMO_SCENARIOS[0]
+        return DEMO_SCENARIOS[0]
 
     def _build(self, req: QueryRequest, scenario: dict) -> QueryResponse:
         payload = copy.deepcopy(scenario)
