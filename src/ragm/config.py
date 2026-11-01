@@ -18,6 +18,8 @@ class Settings(BaseSettings):
     # ---- vector db ----
     milvus_uri: str = "http://127.0.0.1:19530"
     milvus_collection: str = "rag_chunks"
+    milvus_child_collection: str = "rag_children"
+    parents_path: Path | None = None
 
     # ---- graph db ----
     neo4j_uri: str = "bolt://127.0.0.1:7687"

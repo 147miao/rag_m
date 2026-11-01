@@ -76,6 +76,7 @@ curl -N -X POST http://127.0.0.1:8000/api/query/stream \
 - 服务层抽象：`src/ragm/rag/service.py` 定义 `RagService` Protocol；当前默认 `LangGraphRagService`（`served_by=langgraph`：分类 → hybrid 检索 → gemma4 生成 → 引用校验），Milvus/LLM 不可用时回退 `DemoRagService`
 - 路由分类器：`src/ragm/classifier/`（rules / prompt-llm / lora 三种后端）；当前默认 `CLASSIFIER_BACKEND=lora` + `CLASSIFIER_RUN_DIR=models/classifier/s1_06b_plain`（Qwen3-0.6B + SEQ_CLS LoRA，test_human macro-F1 0.898，36ms/条）
 - 进度监控：`make status`（或 `python scripts/status.py --watch 10`）、`GET /api/status`、前端顶栏训练徽章
+- 真实文档测试：抓取萌娘百科 30 篇火影文档（250k 字）→ small-to-big 入库 → 12 题端到端 **12/12 正确、引用 100%**，详见 [docs/16-naruto-real-docs.md](docs/16-naruto-real-docs.md)
 - 生成质量评测（v2，修正口径）：faithfulness 0.978、context_recall 0.975、citation 0.975、answer_relevancy 0.767；详见 [docs/14-generation-eval-v2.md](docs/14-generation-eval-v2.md)
 - Rerank 生成层对照：英文 faithfulness 0.915→0.990（+7.5）、中文无变化，详见 [docs/15-rerank-generation-eval.md](docs/15-rerank-generation-eval.md)
 - Reranker：bge-reranker-base（EN nDCG@10 0.922、p50 59ms），hybrid top-20 → rerank → top-k，详见 [docs/12-reranker.md](docs/12-reranker.md)

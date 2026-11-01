@@ -10,7 +10,7 @@ from ..embeddings.embedder import Embedder
 from ..observability.tracing import traceable
 from .milvus_store import MilvusStore
 
-CHILD_COLLECTION = "rag_children"
+CHILD_COLLECTION = "rag_children"  # 兼容旧默认值
 
 
 class SearchService:
@@ -19,9 +19,10 @@ class SearchService:
             raise RuntimeError("EMBED_MODEL_PATH 未配置")
         self.settings = settings
         self.store = MilvusStore(settings.milvus_uri, settings.milvus_collection, settings.embed_dim)
-        self.child_store = MilvusStore(settings.milvus_uri, CHILD_COLLECTION, settings.embed_dim, with_parent=True)
+        child_collection = settings.milvus_child_collection or CHILD_COLLECTION
+        self.child_store = MilvusStore(settings.milvus_uri, child_collection, settings.embed_dim, with_parent=True)
         self.parents: dict[str, dict] = {}
-        parents_path = Path(settings.data_root) / "data" / "rag" / "parents.jsonl"
+        parents_path = settings.parents_path or (Path(settings.data_root) / "data" / "rag" / "parents.jsonl")
         if parents_path.exists():
             for line in parents_path.read_text(encoding="utf-8").splitlines():
                 if line.strip():
@@ -123,7 +124,7 @@ class SearchService:
         return {
             "collection": self.store.collection,
             "rows": self.store.count(),
-            "child_collection": CHILD_COLLECTION,
+            "child_collection": self.child_store.collection,
             "child_rows": self.child_store.count(),
             "parents_loaded": len(self.parents),
             "model": self.embedder.path,
