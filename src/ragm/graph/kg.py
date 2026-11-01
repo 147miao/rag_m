@@ -7,14 +7,16 @@ from ..api.schemas import GraphEdge, GraphNode, GraphPayload
 
 
 class KGStore:
-    def __init__(self, uri: str, user: str, password: str) -> None:
+    def __init__(self, uri: str, user: str, password: str, label: str = "Entity", relation: str = "CO_EVIDENCE") -> None:
+        self.label = label
+        self.relation = relation
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
         self.names: list[str] = []
         self.name_set: set[str] = set()
 
     def load(self) -> int:
         with self.driver.session() as s:
-            self.names = [r["n"] for r in s.run("MATCH (e:Entity) RETURN e.name AS n")]
+            self.names = [r["n"] for r in s.run(f"MATCH (e:{self.label}) RETURN e.name AS n")]
         self.name_set = set(self.names)
         return len(self.names)
 
@@ -45,7 +47,7 @@ class KGStore:
         if not names:
             return [], []
         cypher = (
-            "MATCH (a:Entity)-[r:CO_EVIDENCE]->(b:Entity) "
+            f"MATCH (a:{self.label})-[r:{self.relation}]-(b:{self.label}) "
             "WHERE a.name IN $names "
             "RETURN a.name AS a, b.name AS b, r.qid AS qid, r.qtype AS qtype, r.question AS question "
             "LIMIT $limit"

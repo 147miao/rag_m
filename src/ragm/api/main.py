@@ -72,7 +72,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.kg = None
     if settings.rag_backend == "langgraph" and app.state.search is not None:
         try:
-            kg = KGStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)
+            kg = KGStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password, settings.kg_label, settings.kg_relation)
             n = kg.load()
             app.state.kg = kg
             logger.info("kg ready: %s entities", n)
