@@ -1,0 +1,43 @@
+Loading weights:   0%|          | 0/314 [00:00<?, ?it/s]Loading weights:   0%|          | 1/314 [00:00<03:09,  1.65it/s]Loading weights: 100%|██████████| 314/314 [00:00<00:00, 501.14it/s]
+[en] candidates for 300 queries in 9.4s
+[zh] candidates for 100 queries in 3.2s
+{"recall@5": 0.805, "recall@10": 0.885, "ndcg@10": 0.8103, "mrr@10": 0.9009, "recall@20": 0.935, "model": "no_rerank(hybrid)", "lang": "en", "p50_ms": 0.0, "peak_vram_gib": 0.0}
+{"recall@5": 0.98, "recall@10": 1.0, "ndcg@10": 0.9631, "mrr@10": 0.9516, "recall@20": 1.0, "model": "no_rerank(hybrid)", "lang": "zh", "p50_ms": 0.0, "peak_vram_gib": 0.0}
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:   4%|▍         | 9/201 [00:00<00:04, 47.10it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 1032.65it/s]
+{"recall@5": 0.915, "recall@10": 0.93, "ndcg@10": 0.9217, "mrr@10": 0.9867, "recall@20": 0.935, "model": "bge-reranker-base", "lang": "en", "load_s": 1.5, "p50_ms": 59.3, "total_s": 18.3, "peak_vram_gib": 1.22}
+{"recall@5": 1.0, "recall@10": 1.0, "ndcg@10": 0.995, "mrr@10": 0.9933, "recall@20": 1.0, "model": "bge-reranker-base", "lang": "zh", "load_s": 1.5, "p50_ms": 106.9, "total_s": 10.5, "peak_vram_gib": 1.22}
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights:   2%|▏         | 9/393 [00:01<00:44,  8.63it/s]Loading weights: 100%|██████████| 393/393 [00:01<00:00, 357.36it/s]
+{"recall@5": 0.915, "recall@10": 0.9333, "ndcg@10": 0.9147, "mrr@10": 0.9773, "recall@20": 0.935, "model": "bge-reranker-v2-m3", "lang": "en", "load_s": 2.1, "p50_ms": 183.3, "total_s": 56.8, "peak_vram_gib": 1.8}
+{"recall@5": 1.0, "recall@10": 1.0, "ndcg@10": 0.995, "mrr@10": 0.9933, "recall@20": 1.0, "model": "bge-reranker-v2-m3", "lang": "zh", "load_s": 2.1, "p50_ms": 332.3, "total_s": 32.7, "peak_vram_gib": 1.8}
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 1/310 [00:00<01:19,  3.90it/s]Loading weights:   9%|▊         | 27/310 [00:00<00:03, 93.24it/s]Loading weights:  19%|█▉        | 59/310 [00:00<00:01, 166.54it/s]Loading weights:  26%|██▌       | 81/310 [00:00<00:01, 178.06it/s]Loading weights:  37%|███▋      | 114/310 [00:00<00:00, 220.61it/s]Loading weights:  47%|████▋     | 147/310 [00:00<00:00, 247.99it/s]Loading weights:  58%|█████▊    | 180/310 [00:00<00:00, 257.81it/s]Loading weights:  67%|██████▋   | 208/310 [00:01<00:00, 231.71it/s]Loading weights:  75%|███████▌  | 233/310 [00:01<00:00, 219.79it/s]Loading weights:  83%|████████▎ | 256/310 [00:01<00:00, 163.76it/s]Loading weights:  89%|████████▊ | 275/310 [00:01<00:00, 163.90it/s]Loading weights:  97%|█████████▋| 301/310 [00:01<00:00, 185.82it/s]Loading weights: 100%|██████████| 310/310 [00:01<00:00, 188.08it/s]
+Traceback (most recent call last):
+  File "/home/myj/develop_项目/rag_m/scripts/bench_rerankers.py", line 121, in <module>
+    main()
+    ~~~~^^
+  File "/home/myj/develop_项目/rag_m/scripts/bench_rerankers.py", line 96, in main
+    reranked = reranker.rerank(c["question"], c["hits"], top_n=TOP_CANDIDATES)
+  File "/home/myj/develop_项目/rag_m/src/ragm/embeddings/reranker.py", line 85, in rerank
+    scores = self.score(query, [h.get("text", "")[:2000] for h in hits])
+  File "/home/myj/develop_项目/rag_m/.venv/lib/python3.13/site-packages/torch/utils/_contextlib.py", line 158, in inference_mode
+    return func(*args, **kwargs)
+  File "/home/myj/develop_项目/rag_m/src/ragm/embeddings/reranker.py", line 77, in score
+    logits = self.model(**enc).logits[:, -1, :]
+             ~~~~~~~~~~^^^^^^^
+  File "/home/myj/develop_项目/rag_m/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1787, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/myj/develop_项目/rag_m/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1798, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/myj/develop_项目/rag_m/.venv/lib/python3.13/site-packages/transformers/utils/generic.py", line 943, in wrapper
+    output = func(self, *args, **kwargs)
+  File "/home/myj/develop_项目/rag_m/.venv/lib/python3.13/site-packages/transformers/models/qwen3/modeling_qwen3.py", line 481, in forward
+    logits = self.lm_head(hidden_states)
+  File "/home/myj/develop_项目/rag_m/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1787, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "/home/myj/develop_项目/rag_m/.venv/lib/python3.13/site-packages/torch/nn/modules/module.py", line 1798, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/home/myj/develop_项目/rag_m/.venv/lib/python3.13/site-packages/torch/nn/modules/linear.py", line 134, in forward
+    return F.linear(input, self.weight, self.bias)
+           ~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+torch.OutOfMemoryError: CUDA out of memory. Tried to allocate 714.00 MiB. GPU 0 has a total capacity of 7.62 GiB of which 385.94 MiB is free. Process 4768 has 512.80 MiB memory in use. Process 5637 has 60.44 MiB memory in use. Process 10502 has 56.59 MiB memory in use. Process 11047 has 72.28 MiB memory in use. Process 14322 has 24.66 MiB memory in use. Process 15011 has 224.22 MiB memory in use. Process 33501 has 98.09 MiB memory in use. Process 3631 has 42.41 MiB memory in use. Including non-PyTorch memory, this process has 3.06 GiB memory in use. Process 78128 has 2.46 GiB memory in use. Of the allocated memory 2.42 GiB is allocated by PyTorch, and 535.55 MiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://docs.pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf)

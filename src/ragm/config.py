@@ -36,7 +36,11 @@ class Settings(BaseSettings):
     embed_batch_size: int = 32
     embed_model_path: Path | None = None
     embed_max_len: int = 512
-    rerank_model: str = "Qwen/Qwen3-Reranker-0.6B"
+    rerank_model: str = "bge-reranker-v2-m3"
+    rerank_enabled: bool = False
+    rerank_model_path: Path | None = None
+    rerank_candidates: int = 20
+    rerank_top_n: int = 8
 
     # ---- classifier ----
     classifier_backend: str = "rules"  # rules | prompt | lora

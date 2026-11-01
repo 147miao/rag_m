@@ -76,6 +76,7 @@ curl -N -X POST http://127.0.0.1:8000/api/query/stream \
 - 服务层抽象：`src/ragm/rag/service.py` 定义 `RagService` Protocol；当前默认 `LangGraphRagService`（`served_by=langgraph`：分类 → hybrid 检索 → gemma4 生成 → 引用校验），Milvus/LLM 不可用时回退 `DemoRagService`
 - 路由分类器：`src/ragm/classifier/`（rules / prompt-llm / lora 三种后端）；当前默认 `CLASSIFIER_BACKEND=lora` + `CLASSIFIER_RUN_DIR=models/classifier/s1_06b_plain`（Qwen3-0.6B + SEQ_CLS LoRA，test_human macro-F1 0.898，36ms/条）
 - 进度监控：`make status`（或 `python scripts/status.py --watch 10`）、`GET /api/status`、前端顶栏训练徽章
+- Reranker：bge-reranker-base（EN nDCG@10 0.922、p50 59ms），hybrid top-20 → rerank → top-k，详见 [docs/12-reranker.md](docs/12-reranker.md)
 - 生成链路：LangGraph StateGraph（classify → retrieve → generate → verify），SSE 流式输出，详见 [docs/09-langgraph-generation.md](docs/09-langgraph-generation.md)
 - Agentic 工具链：LangGraph 工具循环（vector_search / kg_query / web_search），agentic 路由按需调用，详见 [docs/11-agentic-langsmith.md](docs/11-agentic-langsmith.md)
 - LangSmith 监控：`LANGSMITH_TRACING=true` + `LANGSMITH_API_KEY` 即启用（span 覆盖 LLM/检索/工具/Graph 节点）

@@ -11,6 +11,7 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from ..embeddings.reranker import BaseReranker
 from ..graph.kg import KGStore
 from .citations import verify_citations
 from .llm import LLMClient
@@ -35,6 +36,7 @@ class RagState(TypedDict, total=False):
     kg_seeds: list[str]
     graph_added: int
     retrieve_detail: str
+    rerank_ms: float | None
     answer_lead: str
     answer_body: str
     generate_ms: float
@@ -87,6 +89,8 @@ class RagGraph:
         llm: LLMClient,
         *,
         kg: KGStore | None = None,
+        reranker: BaseReranker | None = None,
+        rerank_candidates: int = 20,
         max_tokens: int = 1024,
         top_k: int = 8,
         multihop_k: int = 12,
@@ -96,6 +100,8 @@ class RagGraph:
         self.search = search
         self.llm = llm
         self.kg = kg
+        self.reranker = reranker
+        self.rerank_candidates = rerank_candidates
         self.max_tokens = max_tokens
         self.top_k = top_k
         self.multihop_k = multihop_k
@@ -143,11 +149,20 @@ class RagGraph:
             kg_paths = edges[:20]
             if kg_seeds:
                 kg_payload = self.kg.payload(state["question"], kg_seeds, kg_paths, titles[:6])
+        rerank_ms = None
+        if self.reranker is not None and hits:
+            t_r = time.perf_counter()
+            hits = self.reranker.rerank(state["question"], hits[: self.rerank_candidates], top_n=max(k, 8))
+            rerank_ms = round((time.perf_counter() - t_r) * 1000, 1)
         detail = f"dense + BM25 · RRF · top {len(hits)}"
         if graph_added:
             detail += f" · 图谱 +{graph_added}"
+        if rerank_ms is not None:
+            detail += f" · 重排 {self.reranker.name}"
         return {
             "hits": hits,
+            "rerank_ms": rerank_ms,
+            "rerank_model": self.reranker.name if self.reranker is not None else None,
             "retrieve_ms": round((time.perf_counter() - t0) * 1000, 1),
             "kg_paths": kg_paths,
             "kg_payload": kg_payload,

@@ -1,0 +1,7 @@
+reused candidates from reports/rerank_candidates.json
+{"recall@5": 0.805, "recall@10": 0.885, "ndcg@10": 0.8103, "mrr@10": 0.9009, "recall@20": 0.935, "model": "no_rerank(hybrid)", "lang": "en", "p50_ms": 0.0, "peak_vram_gib": 0.0}
+{"recall@5": 0.98, "recall@10": 1.0, "ndcg@10": 0.9631, "mrr@10": 0.9516, "recall@20": 1.0, "model": "no_rerank(hybrid)", "lang": "zh", "p50_ms": 0.0, "peak_vram_gib": 0.0}
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights:   2%|▏         | 9/393 [00:00<00:08, 43.60it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 1423.83it/s]
+{"recall@5": 0.915, "recall@10": 0.9333, "ndcg@10": 0.9147, "mrr@10": 0.9773, "recall@20": 0.935, "model": "bge-reranker-v2-m3", "lang": "en", "load_s": 3.3, "p50_ms": 231.0, "total_s": 72.1, "peak_vram_gib": 1.23}
+{"recall@5": 1.0, "recall@10": 1.0, "ndcg@10": 0.995, "mrr@10": 0.9933, "recall@20": 1.0, "model": "bge-reranker-v2-m3", "lang": "zh", "load_s": 3.3, "p50_ms": 426.7, "total_s": 43.0, "peak_vram_gib": 1.23}
+saved reports/reranker_v2m3.json

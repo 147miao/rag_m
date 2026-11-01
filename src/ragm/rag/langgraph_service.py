@@ -46,6 +46,7 @@ class LangGraphRagService:
         kg: KGStore | None = None,
         agent: AgentGraph | None = None,
         executor: ToolExecutor | None = None,
+        reranker: Any = None,
     ) -> None:
         self.settings = settings
         self.kg = kg
@@ -56,6 +57,8 @@ class LangGraphRagService:
             search,
             llm,
             kg=kg,
+            reranker=reranker,
+            rerank_candidates=settings.rerank_candidates,
             max_tokens=settings.rag_max_tokens,
             top_k=settings.rag_top_k,
             multihop_k=settings.rag_multihop_k,
@@ -101,12 +104,19 @@ class LangGraphRagService:
                 TraceStep(key="generate", label="生成", ms=int(state.get("generate_ms", 0)), detail=f"{state.get('tokens_in', 0):,} in / {state.get('tokens_out', 0):,} out"),
                 TraceStep(key="verify", label="引用校验", ms=int(state.get("verify_ms", 0)), detail=state.get("citation_check", "")),
             ]
-        return [
+        steps = [
             TraceStep(key="route", label="路由分类", ms=int(state.get("classify_ms", 0)), detail=f"{state.get('classifier_backend', '')} · {route} {state.get('confidence', 0):.2f}"),
             TraceStep(key="retrieve", label="混合检索", ms=int(state.get("retrieve_ms", 0)), detail=state.get("retrieve_detail") or f"dense + BM25 · RRF · top {len(hits)}"),
-            TraceStep(key="generate", label="生成", ms=int(state.get("generate_ms", 0)), detail=f"{state.get('tokens_in', 0):,} in / {state.get('tokens_out', 0):,} out"),
-            TraceStep(key="verify", label="引用校验", ms=int(state.get("verify_ms", 0)), detail=state.get("citation_check", "")),
         ]
+        if state.get("rerank_ms") is not None:
+            steps.append(TraceStep(key="rerank", label="重排", ms=int(state["rerank_ms"]), detail=f"{state.get('rerank_model', 'reranker')} · top {len(hits)}"))
+        steps.extend(
+            [
+                TraceStep(key="generate", label="生成", ms=int(state.get("generate_ms", 0)), detail=f"{state.get('tokens_in', 0):,} in / {state.get('tokens_out', 0):,} out"),
+                TraceStep(key="verify", label="引用校验", ms=int(state.get("verify_ms", 0)), detail=state.get("citation_check", "")),
+            ]
+        )
+        return steps
 
     def _build(self, req: QueryRequest, state: dict, latency_ms: int) -> QueryResponse:
         hits = state.get("hits") or []

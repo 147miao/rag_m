@@ -27,6 +27,7 @@ from ..agent.agent_graph import AgentGraph
 from ..agent.tools import ToolExecutor
 from ..classifier.factory import build_classifier
 from ..config import get_settings
+from ..embeddings.reranker import build_reranker
 from ..graph.kg import KGStore
 from ..observability.tracing import configure_tracing
 from ..rag.langgraph_service import LangGraphRagService
@@ -78,11 +79,18 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         except Exception:
             app.state.kg = None
             logger.warning("neo4j unavailable, graph expansion disabled", exc_info=True)
+        reranker = None
+        if settings.rerank_enabled and settings.rerank_model_path:
+            try:
+                reranker = build_reranker(settings.rerank_model, str(settings.rerank_model_path))
+                logger.info("reranker ready: %s", settings.rerank_model)
+            except Exception:
+                logger.warning("reranker unavailable", exc_info=True)
         llm = LLMClient(settings.llm_base_url, settings.llm_model, settings.llm_api_key, settings.llm_temperature)
         executor = ToolExecutor(app.state.search, app.state.kg, settings)
         agent = AgentGraph(llm, executor, max_iterations=settings.agent_max_iterations, max_tokens=settings.rag_max_tokens)
         app.state.service = LangGraphRagService(
-            app.state.classifier, app.state.search, llm, settings, kg=app.state.kg, agent=agent, executor=executor
+            app.state.classifier, app.state.search, llm, settings, kg=app.state.kg, agent=agent, executor=executor, reranker=reranker
         )
         logger.info("rag backend=langgraph | llm=%s | kg=%s | agent tools=%s", settings.llm_model, app.state.kg is not None, True)
     else:

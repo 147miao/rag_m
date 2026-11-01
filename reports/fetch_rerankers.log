@@ -1,0 +1,19 @@
+[bge-reranker-v2-m3] 7 files, 2293 MB
+  OK config.json
+  OK configuration.json
+  OK special_tokens_map.json
+  OK sentencepiece.bpe.model
+  OK tokenizer_config.json
+  OK tokenizer.json
+  OK model.safetensors
+[bge-reranker-base] 8 files, 2247 MB
+  OK config.json
+  OK configuration.json
+  OK special_tokens_map.json
+  OK sentencepiece.bpe.model
+  OK tokenizer_config.json
+  OK tokenizer.json
+  OK pytorch_model.bin
+  OK model.safetensors
+bge-reranker-base: 2247 MB
+bge-reranker-v2-m3: 2293 MB
