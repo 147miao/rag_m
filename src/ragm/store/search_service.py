@@ -67,6 +67,20 @@ class SearchService:
             "hits": ranked,
         }
 
+    def chunks_by_titles(self, titles: list[str], limit: int = 8) -> list[dict]:
+        """按标题批量取 chunk（图谱扩展后的证据补齐）。"""
+        if not titles:
+            return []
+        escaped = [t.replace('\\', '\\\\').replace('"', '\\"') for t in titles[:20]]
+        expr = "title in [" + ", ".join('"' + t + '"' for t in escaped) + "]"
+        rows = self.store.client.query(
+            collection_name=self.store.collection,
+            filter=expr,
+            output_fields=["chunk_id", "doc_id", "title", "source", "lang", "chunk_index", "text"],
+            limit=limit,
+        )
+        return [dict(r) for r in rows]
+
     def search_small2big(self, query: str, k: int = 8, k_children: int = 50) -> dict:
         """小块检索（精确性）→ 父块上下文（丰富性），按 parent 去重后返回 top-k。"""
         t0 = time.perf_counter()

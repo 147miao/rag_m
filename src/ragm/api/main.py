@@ -25,6 +25,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .. import __version__
 from ..classifier.factory import build_classifier
 from ..config import get_settings
+from ..graph.kg import KGStore
 from ..rag.langgraph_service import LangGraphRagService
 from ..rag.llm import LLMClient
 from ..rag.service import DemoRagService
@@ -55,6 +56,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.service = DemoRagService()
     app.state.classifier = build_classifier()
     app.state.search = None
+    app.state.kg = None
     settings = get_settings()
     try:
         app.state.search = SearchService(settings)
@@ -62,10 +64,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     except Exception:
         app.state.search = None
         logger.warning("search service unavailable (embedding model / milvus)", exc_info=True)
+    app.state.kg = None
     if settings.rag_backend == "langgraph" and app.state.search is not None:
+        try:
+            kg = KGStore(settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password)
+            n = kg.load()
+            app.state.kg = kg
+            logger.info("kg ready: %s entities", n)
+        except Exception:
+            app.state.kg = None
+            logger.warning("neo4j unavailable, graph expansion disabled", exc_info=True)
         llm = LLMClient(settings.llm_base_url, settings.llm_model, settings.llm_api_key, settings.llm_temperature)
-        app.state.service = LangGraphRagService(app.state.classifier, app.state.search, llm, settings)
-        logger.info("rag backend=langgraph | llm=%s", settings.llm_model)
+        app.state.service = LangGraphRagService(app.state.classifier, app.state.search, llm, settings, kg=app.state.kg)
+        logger.info("rag backend=langgraph | llm=%s | kg=%s", settings.llm_model, app.state.kg is not None)
     else:
         logger.info("rag backend=demo | milvus=%s", settings.milvus_uri)
     yield

@@ -25,6 +25,7 @@ from ..api.schemas import (
 )
 from ..classifier.base import ROUTE_TO_LABEL
 from ..config import Settings
+from ..graph.kg import KGStore
 from .demo import DEMO_SCENARIOS
 from .graph import RagGraph
 from .llm import LLMClient
@@ -33,12 +34,14 @@ DATASET_NAMES = {"hotpotqa": "HotpotQA", "cmrc": "CMRC2018", "pubmedqa": "PubMed
 
 
 class LangGraphRagService:
-    def __init__(self, classifier: Any, search: Any, llm: LLMClient, settings: Settings) -> None:
+    def __init__(self, classifier: Any, search: Any, llm: LLMClient, settings: Settings, kg: KGStore | None = None) -> None:
         self.settings = settings
+        self.kg = kg
         self.rag = RagGraph(
             classifier,
             search,
             llm,
+            kg=kg,
             max_tokens=settings.rag_max_tokens,
             top_k=settings.rag_top_k,
             multihop_k=settings.rag_multihop_k,
@@ -77,7 +80,7 @@ class LangGraphRagService:
         route = state.get("route", "simple")
         trace = [
             TraceStep(key="route", label="路由分类", ms=int(state.get("classify_ms", 0)), detail=f"{state.get('classifier_backend', '')} · {route} {state.get('confidence', 0):.2f}"),
-            TraceStep(key="retrieve", label="混合检索", ms=int(state.get("retrieve_ms", 0)), detail=f"dense + BM25 · RRF · top {len(hits)}"),
+            TraceStep(key="retrieve", label="混合检索", ms=int(state.get("retrieve_ms", 0)), detail=state.get("retrieve_detail") or f"dense + BM25 · RRF · top {len(hits)}"),
             TraceStep(key="generate", label="生成", ms=int(state.get("generate_ms", 0)), detail=f"{state.get('tokens_in', 0):,} in / {state.get('tokens_out', 0):,} out"),
             TraceStep(key="verify", label="引用校验", ms=int(state.get("verify_ms", 0)), detail=state.get("citation_check", "")),
         ]
@@ -93,7 +96,7 @@ class LangGraphRagService:
             evidence=self._evidence(hits),
             trace=trace,
             tools=None,
-            graph=None,
+            graph=state.get("kg_payload"),
             stats=Stats(
                 latency_ms=latency_ms,
                 tokens_in=int(state.get("tokens_in", 0)),
@@ -125,7 +128,7 @@ class LangGraphRagService:
         state = await asyncio.to_thread(self.rag.prepare, req.question, req.route_override)
         steps = [
             ("route", "路由分类", state.get("classify_ms", 0), f"{state.get('classifier_backend', '')} · {state.get('route')} {state.get('confidence', 0):.2f}"),
-            ("retrieve", "混合检索", state.get("retrieve_ms", 0), f"dense + BM25 · RRF · top {len(state.get('hits') or [])}"),
+            ("retrieve", "混合检索", state.get("retrieve_ms", 0), state.get("retrieve_detail") or f"dense + BM25 · RRF · top {len(state.get('hits') or [])}"),
         ]
         for index, (key, label, ms, detail) in enumerate(steps):
             yield StageEvent(index=index, step=TraceStep(key=key, label=label, ms=int(ms), detail=detail))

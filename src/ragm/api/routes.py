@@ -101,6 +101,8 @@ async def health(request: Request) -> HealthResponse:
         checks["classifier"] = HealthCheck(ok=True, detail=str(info.get("backend", "?")))
     except Exception as exc:  # noqa: BLE001
         checks["classifier"] = HealthCheck(ok=False, detail=type(exc).__name__)
+    kg = getattr(request.app.state, "kg", None)
+    checks["kg"] = HealthCheck(ok=kg is not None, detail=f"{len(kg.names)} entities" if kg is not None else "disabled")
     status = "ok" if all(c.ok for c in checks.values()) else "degraded"
     return HealthResponse(
         status=status,

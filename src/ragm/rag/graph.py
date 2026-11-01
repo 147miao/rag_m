@@ -11,6 +11,7 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from ..graph.kg import KGStore
 from .citations import verify_citations
 from .llm import LLMClient
 from .prompts import build_messages, build_messages_plain
@@ -29,6 +30,11 @@ class RagState(TypedDict, total=False):
     classify_ms: float
     hits: list[dict]
     retrieve_ms: float
+    kg_paths: list[dict]
+    kg_payload: Any
+    kg_seeds: list[str]
+    graph_added: int
+    retrieve_detail: str
     answer_lead: str
     answer_body: str
     generate_ms: float
@@ -80,6 +86,7 @@ class RagGraph:
         search: Any,
         llm: LLMClient,
         *,
+        kg: KGStore | None = None,
         max_tokens: int = 1024,
         top_k: int = 8,
         multihop_k: int = 12,
@@ -88,6 +95,7 @@ class RagGraph:
         self.classifier = classifier
         self.search = search
         self.llm = llm
+        self.kg = kg
         self.max_tokens = max_tokens
         self.top_k = top_k
         self.multihop_k = multihop_k
@@ -113,14 +121,47 @@ class RagGraph:
         route = state.get("route", "simple")
         k = {"simple": self.top_k, "multihop": self.multihop_k, "agentic": self.agentic_k}.get(route, self.top_k)
         res = self.search.search_with_scores(state["question"], k=k)
-        return {"hits": res["hits"], "retrieve_ms": round((time.perf_counter() - t0) * 1000, 1)}
+        hits = res["hits"]
+        kg_paths: list[dict] = []
+        kg_payload = None
+        kg_seeds: list[str] = []
+        graph_added = 0
+        if self.kg is not None and route == "multihop":
+            kg_seeds = self.kg.link(state["question"], [h.get("title") or "" for h in hits])
+            edges, neighbors = self.kg.expand(kg_seeds, limit=40)
+            titles = [n for n in neighbors if n not in kg_seeds][:12]
+            graph_chunks = self.search.chunks_by_titles(titles, limit=8)
+            existing = {h["chunk_id"] for h in hits}
+            extra = []
+            for gc in graph_chunks:
+                if gc["chunk_id"] in existing:
+                    continue
+                extra.append({**gc, "score": 0.5, "dense": 0.0, "sparse": 0.0, "graph": True})
+                existing.add(gc["chunk_id"])
+            graph_added = len(extra)
+            hits = (extra + hits)[: k + 4]
+            kg_paths = edges[:20]
+            if kg_seeds:
+                kg_payload = self.kg.payload(state["question"], kg_seeds, kg_paths, titles[:6])
+        detail = f"dense + BM25 · RRF · top {len(hits)}"
+        if graph_added:
+            detail += f" · 图谱 +{graph_added}"
+        return {
+            "hits": hits,
+            "retrieve_ms": round((time.perf_counter() - t0) * 1000, 1),
+            "kg_paths": kg_paths,
+            "kg_payload": kg_payload,
+            "kg_seeds": kg_seeds,
+            "graph_added": graph_added,
+            "retrieve_detail": detail,
+        }
 
     def _generate_node(self, state: RagState) -> dict:
         t0 = time.perf_counter()
         hits = state.get("hits") or []
         if not hits:
             return {"answer_lead": "", "answer_body": "", "generate_ms": 0.0, "tokens_in": 0, "tokens_out": 0}
-        messages = build_messages(state["question"], hits, state.get("route", "simple"))
+        messages = build_messages(state["question"], hits, state.get("route", "simple"), state.get("kg_paths") or [])
         out = self.llm.chat(messages, self.max_tokens)
         lead, body = parse_structured_answer(out["text"])
         return {
@@ -181,7 +222,9 @@ class RagGraph:
         return state
 
     def stream_messages(self, state: RagState) -> list[dict]:
-        return build_messages_plain(state["question"], state.get("hits") or [], state.get("route", "simple"))
+        return build_messages_plain(
+            state["question"], state.get("hits") or [], state.get("route", "simple"), state.get("kg_paths") or []
+        )
 
     def finish_stream(self, state: RagState, text: str, tokens_in: int = 0, tokens_out: int = 0) -> RagState:
         lead, body = split_plain_answer(text)

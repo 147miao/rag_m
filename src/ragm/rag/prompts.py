@@ -33,16 +33,28 @@ def _context_lines(hits: list[dict]) -> list[str]:
     return lines
 
 
-def build_messages(question: str, hits: list[dict], route: str) -> list[dict]:
-    lines = _context_lines(hits)
+def _question_language(question: str) -> str:
+    return "中文" if any("\u4e00" <= ch <= "\u9fff" for ch in question) else "英文"
+
+
+def build_messages(question: str, hits: list[dict], route: str, kg_paths: list[dict] | None = None) -> list[dict]:
+    lines: list[str] = []
+    if kg_paths:
+        lines.append("【图谱关系】（实体间的多跳连接，来自知识图谱）")
+        for i, e in enumerate(kg_paths[:12], start=1):
+            q = " ".join(str(e.get("question") or "").split())[:90]
+            lines.append(f"  G{i}. {e.get('a')} —[{e.get('qtype') or 'co_evidence'}]→ {e.get('b')}（依据问题：{q}）")
+        lines.append("")
+    lines.extend(_context_lines(hits))
     lines.append("")
     lines.append(f"【问题】{question}")
     lines.append(f"【路由提示】{ROUTE_HINT.get(route, ROUTE_HINT['simple'])}")
+    lines.append(f"【输出语言】必须用{_question_language(question)}回答，整段答案不得混用其他语言。")
     return [
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": "\n".join(lines)},
     ]
 
 
-def build_messages_plain(question: str, hits: list[dict], route: str) -> list[dict]:
-    return build_messages(question, hits, route)
+def build_messages_plain(question: str, hits: list[dict], route: str, kg_paths: list[dict] | None = None) -> list[dict]:
+    return build_messages(question, hits, route, kg_paths)

@@ -1,0 +1,10 @@
+nodes: 105570 in 5s
+  edges 5000/180894
+  edges 35000/180894
+  edges 65000/180894
+  edges 95000/180894
+  edges 125000/180894
+  edges 155000/180894
+  edges 180894/180894
+edges: 180894 in 8s
+neo4j: 105570 nodes, 180894 edges
