@@ -37,6 +37,7 @@ class RagState(TypedDict, total=False):
     graph_added: int
     retrieve_detail: str
     rerank_ms: float | None
+    rerank_model: str | None
     answer_lead: str
     answer_body: str
     generate_ms: float
