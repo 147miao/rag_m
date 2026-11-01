@@ -103,6 +103,10 @@ async def health(request: Request) -> HealthResponse:
         checks["classifier"] = HealthCheck(ok=False, detail=type(exc).__name__)
     kg = getattr(request.app.state, "kg", None)
     checks["kg"] = HealthCheck(ok=kg is not None, detail=f"{len(kg.names)} entities" if kg is not None else "disabled")
+    checks["langsmith"] = HealthCheck(
+        ok=True,
+        detail=f"enabled · {settings.langsmith_project}" if settings.langsmith_tracing and settings.langsmith_api_key else "disabled",
+    )
     status = "ok" if all(c.ok for c in checks.values()) else "degraded"
     return HealthResponse(
         status=status,

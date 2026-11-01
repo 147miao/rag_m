@@ -9,6 +9,8 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 
+from ..agent.agent_graph import AgentGraph
+from ..agent.tools import ToolExecutor
 from ..api.schemas import (
     Answer,
     ClassifierInfo,
@@ -21,6 +23,7 @@ from ..api.schemas import (
     StageEvent,
     Stats,
     TokenEvent,
+    ToolCall,
     TraceStep,
 )
 from ..classifier.base import ROUTE_TO_LABEL
@@ -34,9 +37,20 @@ DATASET_NAMES = {"hotpotqa": "HotpotQA", "cmrc": "CMRC2018", "pubmedqa": "PubMed
 
 
 class LangGraphRagService:
-    def __init__(self, classifier: Any, search: Any, llm: LLMClient, settings: Settings, kg: KGStore | None = None) -> None:
+    def __init__(
+        self,
+        classifier: Any,
+        search: Any,
+        llm: LLMClient,
+        settings: Settings,
+        kg: KGStore | None = None,
+        agent: AgentGraph | None = None,
+        executor: ToolExecutor | None = None,
+    ) -> None:
         self.settings = settings
         self.kg = kg
+        self.agent = agent
+        self.executor = executor
         self.rag = RagGraph(
             classifier,
             search,
@@ -75,15 +89,35 @@ class LangGraphRagService:
             )
         return out
 
-    def _build(self, req: QueryRequest, state: dict, latency_ms: int) -> QueryResponse:
+    def _trace(self, state: dict) -> list[TraceStep]:
         hits = state.get("hits") or []
         route = state.get("route", "simple")
-        trace = [
+        if state.get("tool_log"):
+            names = ", ".join(t.get("name", "") for t in state["tool_log"]) or "无"
+            return [
+                TraceStep(key="route", label="路由分类", ms=int(state.get("classify_ms", 0)), detail=f"{state.get('classifier_backend', '')} · {route} {state.get('confidence', 0):.2f}"),
+                TraceStep(key="plan", label="Agent 规划", ms=int(state.get("plan_ms", 0)), detail=f"{state.get('iterations', 0)} 轮 · {len(state['tool_log'])} 次工具调用"),
+                TraceStep(key="tools", label="工具调用", ms=int(state.get("tools_ms", 0)), detail=names),
+                TraceStep(key="generate", label="生成", ms=int(state.get("generate_ms", 0)), detail=f"{state.get('tokens_in', 0):,} in / {state.get('tokens_out', 0):,} out"),
+                TraceStep(key="verify", label="引用校验", ms=int(state.get("verify_ms", 0)), detail=state.get("citation_check", "")),
+            ]
+        return [
             TraceStep(key="route", label="路由分类", ms=int(state.get("classify_ms", 0)), detail=f"{state.get('classifier_backend', '')} · {route} {state.get('confidence', 0):.2f}"),
             TraceStep(key="retrieve", label="混合检索", ms=int(state.get("retrieve_ms", 0)), detail=state.get("retrieve_detail") or f"dense + BM25 · RRF · top {len(hits)}"),
             TraceStep(key="generate", label="生成", ms=int(state.get("generate_ms", 0)), detail=f"{state.get('tokens_in', 0):,} in / {state.get('tokens_out', 0):,} out"),
             TraceStep(key="verify", label="引用校验", ms=int(state.get("verify_ms", 0)), detail=state.get("citation_check", "")),
         ]
+
+    def _build(self, req: QueryRequest, state: dict, latency_ms: int) -> QueryResponse:
+        hits = state.get("hits") or []
+        route = state.get("route", "simple")
+        trace = self._trace(state)
+        tools = None
+        if state.get("tool_log"):
+            tools = [
+                ToolCall(name=t.get("name", ""), args=t.get("args", ""), result=t.get("result", ""), ms=int(t.get("ms", 0)), status=t.get("status", "ok"))
+                for t in state["tool_log"]
+            ]
         refusal = state.get("refusal")
         return QueryResponse(
             id="q_" + uuid.uuid4().hex[:12],
@@ -95,7 +129,7 @@ class LangGraphRagService:
             citations=state.get("citations", []),
             evidence=self._evidence(hits),
             trace=trace,
-            tools=None,
+            tools=tools,
             graph=state.get("kg_payload"),
             stats=Stats(
                 latency_ms=latency_ms,
@@ -118,13 +152,61 @@ class LangGraphRagService:
         )
 
     # ---------- contract ----------
+    def _agent_state(self, decision: Any, route: str, astate: dict) -> dict:
+        return {
+            "route": route,
+            "label": decision.label,
+            "confidence": decision.confidence,
+            "reason": decision.reason,
+            "classifier_backend": decision.backend,
+            "classify_ms": decision.latency_ms,
+            "hits": astate.get("hits") or [],
+            "kg_paths": astate.get("kg_paths") or [],
+            "kg_payload": None,
+            "retrieve_detail": f"agent · {len(astate.get('tool_log') or [])} 次工具调用",
+            "answer_lead": astate.get("answer_lead", ""),
+            "answer_body": astate.get("answer_body", ""),
+            "citations": astate.get("citations") or [],
+            "citation_check": astate.get("citation_check", ""),
+            "tokens_in": astate.get("tokens_in", 0),
+            "tokens_out": astate.get("tokens_out", 0),
+            "plan_ms": astate.get("plan_ms", 0),
+            "tools_ms": astate.get("tools_ms", 0),
+            "generate_ms": astate.get("generate_ms", 0),
+            "verify_ms": astate.get("verify_ms", 0),
+            "iterations": astate.get("iterations", 0),
+            "tool_log": astate.get("tool_log") or [],
+            "refusal": astate.get("refusal"),
+        }
+
     async def query(self, req: QueryRequest) -> QueryResponse:
         t0 = time.perf_counter()
+        if self.agent is not None:
+            decision = await asyncio.to_thread(self.rag.classifier.classify, req.question)
+            route = decision.route if req.route_override == "auto" else req.route_override
+            if route == "agentic":
+                astate = await asyncio.to_thread(self.agent.invoke, req.question)
+                state = self._agent_state(decision, route, astate)
+                return self._build(req, state, int((time.perf_counter() - t0) * 1000))
         state = await asyncio.to_thread(self.rag.invoke, req.question, req.route_override)
         return self._build(req, state, int((time.perf_counter() - t0) * 1000))
 
     async def stream(self, req: QueryRequest) -> AsyncIterator[StageEvent | TokenEvent | DoneEvent]:
         t0 = time.perf_counter()
+        if self.agent is not None:
+            decision = await asyncio.to_thread(self.rag.classifier.classify, req.question)
+            route = decision.route if req.route_override == "auto" else req.route_override
+            if route == "agentic":
+                astate = await asyncio.to_thread(self.agent.invoke, req.question)
+                state = self._agent_state(decision, route, astate)
+                for index, step in enumerate(self._trace(state)):
+                    yield StageEvent(index=index, step=step)
+                text = (state.get("answer_lead", "") + "\n\n" + state.get("answer_body", "")).strip()
+                for i in range(0, len(text), 16):
+                    yield TokenEvent(text=text[i : i + 16])
+                    await asyncio.sleep(0.01)
+                yield DoneEvent(response=self._build(req, state, int((time.perf_counter() - t0) * 1000)))
+                return
         state = await asyncio.to_thread(self.rag.prepare, req.question, req.route_override)
         steps = [
             ("route", "路由分类", state.get("classify_ms", 0), f"{state.get('classifier_backend', '')} · {state.get('route')} {state.get('confidence', 0):.2f}"),

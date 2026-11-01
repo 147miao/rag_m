@@ -6,6 +6,8 @@ from collections.abc import Iterator
 
 import httpx
 
+from ..observability.tracing import traceable
+
 
 class LLMError(RuntimeError):
     pass
@@ -31,6 +33,7 @@ class LLMClient:
             body["response_format"] = {"type": "json_object"}
         return body
 
+    @traceable(run_type="llm", name="llm_chat")
     def chat(self, messages: list[dict], max_tokens: int = 1024, json_mode: bool = False) -> dict:
         with httpx.Client(timeout=self.timeout) as client:
             resp = client.post(
@@ -44,6 +47,35 @@ class LLMClient:
         usage = data.get("usage") or {}
         return {
             "text": data["choices"][0]["message"]["content"],
+            "tokens_in": int(usage.get("prompt_tokens") or 0),
+            "tokens_out": int(usage.get("completion_tokens") or 0),
+        }
+
+    @traceable(run_type="llm", name="llm_chat_tools")
+    def chat_tools(self, messages: list[dict], tools: list[dict], max_tokens: int = 1024) -> dict:
+        """带工具调用的 chat：返回 text / tool_calls / usage。"""
+        body = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": self.temperature,
+            "max_tokens": max_tokens,
+            "tools": tools,
+            "tool_choice": "auto",
+        }
+        with httpx.Client(timeout=self.timeout) as client:
+            resp = client.post(
+                f"{self.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json=body,
+            )
+            if resp.status_code >= 400:
+                raise LLMError(f"LLM {resp.status_code}: {resp.text[:300]}")
+            data = resp.json()
+        message = data["choices"][0]["message"]
+        usage = data.get("usage") or {}
+        return {
+            "text": message.get("content") or "",
+            "tool_calls": message.get("tool_calls") or [],
             "tokens_in": int(usage.get("prompt_tokens") or 0),
             "tokens_out": int(usage.get("completion_tokens") or 0),
         }

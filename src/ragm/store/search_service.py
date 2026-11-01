@@ -7,6 +7,7 @@ from pathlib import Path
 
 from ..config import Settings
 from ..embeddings.embedder import Embedder
+from ..observability.tracing import traceable
 from .milvus_store import MilvusStore
 
 CHILD_COLLECTION = "rag_children"
@@ -39,6 +40,7 @@ class SearchService:
             hits = self.store.hybrid_search(query, qvec, k)
         return {"query": query, "mode": mode, "latency_ms": round((time.perf_counter() - t0) * 1000, 1), "hits": hits}
 
+    @traceable(run_type="retriever", name="hybrid_search")
     def search_with_scores(self, query: str, k: int = 8, pool: int = 40) -> dict:
         """dense + sparse 分别检索后在本地做 RRF，保留 dense/sparse 原始分数用于前端证据展示。"""
         t0 = time.perf_counter()

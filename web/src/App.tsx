@@ -96,7 +96,9 @@ export default function App() {
       // ?q=<问题> 可覆盖默认演示问题（用于截图/回归）
       const qParam = p.get('q')
       if (qParam) setQuestion(qParam)
-      postQuery({ question: qParam || initialDemo.question, route_override: 'auto' })
+      const routeParam = p.get('route')
+      const routeOverride = routeParam === 'agentic' || routeParam === 'multihop' || routeParam === 'simple' ? routeParam : 'auto'
+      postQuery({ question: qParam || initialDemo.question, route_override: routeOverride })
         .then((resp) => {
           setResult(resp as unknown as Scenario)
           setPhase('done')

@@ -43,6 +43,17 @@ class Settings(BaseSettings):
     classifier_run_dir: Path | None = None
     classifier_threshold: float = 0.6
 
+    # ---- observability (LangSmith) ----
+    langsmith_tracing: bool = False
+    langsmith_api_key: str | None = None
+    langsmith_project: str = "rag-m"
+    langsmith_endpoint: str = "https://api.smith.langchain.com"
+
+    # ---- agentic ----
+    agent_max_iterations: int = 2
+    web_search_url: str = "http://127.0.0.1:8080/search"
+    web_search_k: int = 5
+
     # ---- generation (langgraph) ----
     rag_backend: str = "langgraph"  # langgraph | demo
     rag_max_tokens: int = 1024

@@ -23,9 +23,12 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import __version__
+from ..agent.agent_graph import AgentGraph
+from ..agent.tools import ToolExecutor
 from ..classifier.factory import build_classifier
 from ..config import get_settings
 from ..graph.kg import KGStore
+from ..observability.tracing import configure_tracing
 from ..rag.langgraph_service import LangGraphRagService
 from ..rag.llm import LLMClient
 from ..rag.service import DemoRagService
@@ -58,6 +61,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.search = None
     app.state.kg = None
     settings = get_settings()
+    configure_tracing(settings)
     try:
         app.state.search = SearchService(settings)
         logger.info("search service ready: %s", app.state.search.info())
@@ -75,8 +79,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             app.state.kg = None
             logger.warning("neo4j unavailable, graph expansion disabled", exc_info=True)
         llm = LLMClient(settings.llm_base_url, settings.llm_model, settings.llm_api_key, settings.llm_temperature)
-        app.state.service = LangGraphRagService(app.state.classifier, app.state.search, llm, settings, kg=app.state.kg)
-        logger.info("rag backend=langgraph | llm=%s | kg=%s", settings.llm_model, app.state.kg is not None)
+        executor = ToolExecutor(app.state.search, app.state.kg, settings)
+        agent = AgentGraph(llm, executor, max_iterations=settings.agent_max_iterations, max_tokens=settings.rag_max_tokens)
+        app.state.service = LangGraphRagService(
+            app.state.classifier, app.state.search, llm, settings, kg=app.state.kg, agent=agent, executor=executor
+        )
+        logger.info("rag backend=langgraph | llm=%s | kg=%s | agent tools=%s", settings.llm_model, app.state.kg is not None, True)
     else:
         logger.info("rag backend=demo | milvus=%s", settings.milvus_uri)
     yield
