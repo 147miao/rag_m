@@ -83,3 +83,23 @@ SearXNG 仅在 Bing 无结果时作为 2 秒超时的兜底。
 
 - `tests/test_agent_tools.py`：工具 schema、截断、未知工具、无图谱降级、tracing 开关/环境变量；
 - 全量 17 条测试通过（含 10 条 API 契约测试）。
+
+## 八、LangSmith 实测（2026-11-01）
+
+配置方式：把 key 写入 `.env`（.env 已在 .gitignore），重启 API。
+
+验证结果：
+
+- `GET /api/health` → `langsmith: enabled · rag-m`；
+- 3 条请求（multihop ×2 + agentic ×1）产生 **4 条 trace / 50 个 run**；
+- 每条 trace 的根节点是 `LangGraph` chain（4~5 个子节点），子 span 包括：
+  - `plan` / `tools` / `synthesize` / `verify`（LangGraph 节点，chain）
+  - `llm_chat_tools` / `llm_chat`（llm）
+  - `vector_search`（tool）、`hybrid_search`（retriever）
+  - `agent_plan` / `agent_synthesize`（chain）
+- agentic 样例 trace（3.39s，5 个子节点）：
+  <https://smith.langchain.com/o/601295fc-d032-4a0c-9cbd-8befd6b6f866/projects/p/b8921e3f-1d59-4344-8865-595de20adad6/r/01a1954c-d7d5-7615-a97d-d77f10834aec?trace_id=01a1954c-d7d5-7615-a97d-d77f10834aec>
+
+注意：
+- key 只写在本机 `.env`，未提交 git、未出现在日志/对话回复中；
+- 如怀疑泄露，去 smith.langchain.com/settings 删除并重建即可（本项目只需改 `.env` 一行并重启）。
