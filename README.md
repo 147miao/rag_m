@@ -76,7 +76,7 @@ curl -N -X POST http://127.0.0.1:8000/api/query/stream \
 - 服务层抽象：`src/ragm/rag/service.py` 定义 `RagService` Protocol；当前默认 `LangGraphRagService`（`served_by=langgraph`：分类 → hybrid 检索 → gemma4 生成 → 引用校验），Milvus/LLM 不可用时回退 `DemoRagService`
 - 路由分类器：`src/ragm/classifier/`（rules / prompt-llm / lora 三种后端）；当前默认 `CLASSIFIER_BACKEND=lora` + `CLASSIFIER_RUN_DIR=models/classifier/s1_06b_plain`（Qwen3-0.6B + SEQ_CLS LoRA，test_human macro-F1 0.898，36ms/条）
 - 进度监控：`make status`（或 `python scripts/status.py --watch 10`）、`GET /api/status`、前端顶栏训练徽章
-- 生成质量评测：faithfulness 0.92(EN)/0.67(ZH)、citation 97.5%，ragas 因依赖冲突改为等价 LLM-judge，详见 [docs/13-generation-eval.md](docs/13-generation-eval.md)
+- 生成质量评测（v2，修正口径）：faithfulness 0.978、context_recall 0.975、citation 0.975、answer_relevancy 0.767；详见 [docs/14-generation-eval-v2.md](docs/14-generation-eval-v2.md)
 - Reranker：bge-reranker-base（EN nDCG@10 0.922、p50 59ms），hybrid top-20 → rerank → top-k，详见 [docs/12-reranker.md](docs/12-reranker.md)
 - 生成链路：LangGraph StateGraph（classify → retrieve → generate → verify），SSE 流式输出，详见 [docs/09-langgraph-generation.md](docs/09-langgraph-generation.md)
 - Agentic 工具链：LangGraph 工具循环（vector_search / kg_query / web_search），agentic 路由按需调用，详见 [docs/11-agentic-langsmith.md](docs/11-agentic-langsmith.md)

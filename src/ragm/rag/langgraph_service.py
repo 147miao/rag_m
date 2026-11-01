@@ -88,6 +88,7 @@ class LangGraphRagService:
                     dense=round(float(h.get("dense") or 0.0), 4),
                     sparse=round(float(h.get("sparse") or 0.0), 4),
                     snippet=" ".join(str(h.get("text") or "").split())[:260],
+                    full_text=" ".join(str(h.get("text") or "").split())[:1200],
                 )
             )
         return out

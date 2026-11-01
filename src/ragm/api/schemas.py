@@ -34,6 +34,7 @@ class Evidence(APIModel):
     dense: float = Field(ge=0, le=1)
     sparse: float = Field(ge=0, le=1)
     snippet: str
+    full_text: str = ""
     highlight: str | None = None
 
 
