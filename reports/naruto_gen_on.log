@@ -1,0 +1,1 @@
+{"n": 28, "config": "rerank_on", "elapsed_s": 27.5, "correct": 1.0, "faithfulness": 0.9482, "context_precision": 2.9193, "context_recall": 1.0, "citation_valid": 1.0, "fact_correct": 1.0, "multihop_correct": 1.0, "p50_latency_ms": 1545}

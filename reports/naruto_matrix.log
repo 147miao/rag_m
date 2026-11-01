@@ -1,0 +1,33 @@
+== embedding embeddinggemma-300m
+Loading weights:   0%|          | 0/314 [00:00<?, ?it/s]Loading weights:   0%|          | 1/314 [00:00<02:52,  1.81it/s]Loading weights: 100%|██████████| 314/314 [00:00<00:00, 540.74it/s]
+{"recall@5": 0.5179, "recall@10": 0.5893, "ndcg@10": 0.5109, "mrr@10": 0.5875, "p50_ms": 29.5, "axis": "embedding", "name": "embeddinggemma-300m", "build_s": 18.7}
+== embedding bge-m3
+Loading weights:   0%|          | 0/391 [00:00<?, ?it/s]Loading weights:   1%|▏         | 5/391 [00:01<01:29,  4.31it/s]Loading weights: 100%|██████████| 391/391 [00:01<00:00, 335.16it/s]
+{"recall@5": 0.5179, "recall@10": 0.625, "ndcg@10": 0.4903, "mrr@10": 0.5256, "p50_ms": 12.3, "axis": "embedding", "name": "bge-m3", "build_s": 23.2}
+== embedding bge-large-zh-v1.5
+Loading weights:   0%|          | 0/391 [00:00<?, ?it/s]Loading weights:   1%|▏         | 5/391 [00:00<00:09, 41.23it/s]Loading weights:  25%|██▍       | 97/391 [00:00<00:00, 507.79it/s]Loading weights:  41%|████      | 161/391 [00:00<00:00, 503.96it/s]Loading weights:  58%|█████▊    | 225/391 [00:00<00:00, 521.99it/s]Loading weights:  71%|███████▏  | 279/391 [00:00<00:00, 521.01it/s]Loading weights:  86%|████████▌ | 337/391 [00:00<00:00, 522.80it/s]Loading weights: 100%|██████████| 391/391 [00:00<00:00, 507.84it/s]
+{"recall@5": 0.4286, "recall@10": 0.5, "ndcg@10": 0.395, "mrr@10": 0.4429, "p50_ms": 12.0, "axis": "embedding", "name": "bge-large-zh-v1.5", "build_s": 22.8}
+== embedding qwen3-embedding-0.6b
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 1/310 [00:00<00:58,  5.31it/s]Loading weights:  19%|█▊        | 58/310 [00:00<00:01, 241.22it/s]Loading weights:  35%|███▌      | 109/310 [00:00<00:00, 341.57it/s]Loading weights:  48%|████▊     | 150/310 [00:00<00:00, 315.26it/s]Loading weights:  60%|██████    | 186/310 [00:00<00:00, 304.45it/s]Loading weights:  82%|████████▏ | 254/310 [00:00<00:00, 410.85it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 363.86it/s]
+{"recall@5": 0.5357, "recall@10": 0.625, "ndcg@10": 0.4754, "mrr@10": 0.5245, "p50_ms": 19.4, "axis": "embedding", "name": "qwen3-embedding-0.6b", "build_s": 41.0}
+{"recall@5": 0.375, "recall@10": 0.5, "ndcg@10": 0.3713, "mrr@10": 0.3876, "p50_ms": 27.3, "axis": "mode", "name": "dense"}
+{"recall@5": 0.3929, "recall@10": 0.4464, "ndcg@10": 0.3691, "mrr@10": 0.4203, "p50_ms": 30.6, "axis": "mode", "name": "sparse"}
+{"recall@5": 0.5179, "recall@10": 0.5893, "ndcg@10": 0.5109, "mrr@10": 0.5875, "p50_ms": 30.8, "axis": "mode", "name": "hybrid"}
+== reranker bge-reranker-base
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:   4%|▍         | 9/201 [00:00<00:09, 19.70it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 435.87it/s]
+{"recall@5": 0.5536, "recall@10": 0.5893, "ndcg@10": 0.4558, "mrr@10": 0.4729, "p50_ms": 81.9, "axis": "reranker", "name": "bge-reranker-base"}
+== reranker bge-reranker-v2-m3
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights:   2%|▏         | 9/393 [00:00<00:37, 10.14it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 426.44it/s]
+{"recall@5": 0.5536, "recall@10": 0.5893, "ndcg@10": 0.4504, "mrr@10": 0.4542, "p50_ms": 210.2, "axis": "reranker", "name": "bge-reranker-v2-m3"}
+== reranker qwen3-reranker-0.6b
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 1/310 [00:00<00:42,  7.31it/s]Loading weights:  12%|█▏        | 38/310 [00:00<00:01, 192.37it/s]Loading weights:  33%|███▎      | 103/310 [00:00<00:00, 378.98it/s]Loading weights:  55%|█████▍    | 169/310 [00:00<00:00, 475.04it/s]Loading weights:  75%|███████▍  | 231/310 [00:00<00:00, 519.68it/s]Loading weights:  94%|█████████▎| 290/310 [00:00<00:00, 538.99it/s]Loading weights: 100%|██████████| 310/310 [00:00<00:00, 462.35it/s]
+{"recall@5": 0.5, "recall@10": 0.5893, "ndcg@10": 0.4441, "mrr@10": 0.4821, "p50_ms": 848.6, "axis": "reranker", "name": "qwen3-reranker-0.6b"}
+== chunk 200
+{"recall@5": 0.5, "recall@10": 0.5536, "ndcg@10": 0.3804, "mrr@10": 0.3815, "p50_ms": 31.6, "axis": "chunk_size", "name": "200", "chunks": 8395}
+== chunk 400
+{"recall@5": 0.5179, "recall@10": 0.6071, "ndcg@10": 0.4375, "mrr@10": 0.473, "p50_ms": 29.1, "axis": "chunk_size", "name": "400", "chunks": 5018}
+== chunk 800
+{"recall@5": 0.5, "recall@10": 0.5893, "ndcg@10": 0.5224, "mrr@10": 0.6036, "p50_ms": 30.8, "axis": "chunk_size", "name": "800", "chunks": 1782}
+== chunk 1600
+{"recall@5": 0.5357, "recall@10": 0.5893, "ndcg@10": 0.5235, "mrr@10": 0.6048, "p50_ms": 31.4, "axis": "chunk_size", "name": "1600", "chunks": 1782}
+saved reports/naruto_retrieval_matrix.json
