@@ -1,0 +1,30 @@
+evaluating 40 questions (v2) ...
+{
+  "en": {
+    "n": 20,
+    "faithfulness": 0.915,
+    "answer_relevancy": 0.7347,
+    "context_precision": 0.2875,
+    "context_recall": 0.95,
+    "citation_valid": 1.0,
+    "p50_latency_ms": 1169
+  },
+  "zh": {
+    "n": 20,
+    "faithfulness": 0.9667,
+    "answer_relevancy": 0.7962,
+    "context_precision": 0.1375,
+    "context_recall": 0.95,
+    "citation_valid": 0.95,
+    "p50_latency_ms": 1132
+  },
+  "all": {
+    "n": 40,
+    "faithfulness": 0.9408,
+    "answer_relevancy": 0.7654,
+    "context_precision": 0.2125,
+    "context_recall": 0.95,
+    "citation_valid": 0.975,
+    "p50_latency_ms": 1144
+  }
+}
