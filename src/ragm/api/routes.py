@@ -17,8 +17,6 @@ from ..config import get_settings
 from ..ops.status import collect_status
 from .schemas import (
     ClassifierInfo,
-    SearchRequest,
-    SearchResponse,
     DoneEvent,
     ErrorBody,
     ErrorResponse,
@@ -31,6 +29,8 @@ from .schemas import (
     RouteRequest,
     RouteResponse,
     ScenarioSummary,
+    SearchRequest,
+    SearchResponse,
     StageEvent,
     TokenEvent,
 )

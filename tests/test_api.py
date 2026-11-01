@@ -12,6 +12,7 @@ from ragm.config import get_settings
 async def client(monkeypatch):
     # 测试固定用规则分类器，避免依赖 GPU / 已训练 adapter
     monkeypatch.setenv("CLASSIFIER_BACKEND", "rules")
+    monkeypatch.setenv("RAG_BACKEND", "demo")
     get_settings.cache_clear()
     app = create_app()
     transport = ASGITransport(app=app)

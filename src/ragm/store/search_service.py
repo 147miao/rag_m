@@ -39,6 +39,34 @@ class SearchService:
             hits = self.store.hybrid_search(query, qvec, k)
         return {"query": query, "mode": mode, "latency_ms": round((time.perf_counter() - t0) * 1000, 1), "hits": hits}
 
+    def search_with_scores(self, query: str, k: int = 8, pool: int = 40) -> dict:
+        """dense + sparse 分别检索后在本地做 RRF，保留 dense/sparse 原始分数用于前端证据展示。"""
+        t0 = time.perf_counter()
+        qvec = self.embedder.encode_queries([query])[0].tolist()
+        dense_hits = self.store.dense_search(qvec, pool)
+        sparse_hits = self.store.sparse_search(query, pool)
+        merged: dict[str, dict] = {}
+        for rank, h in enumerate(dense_hits):
+            item = merged.setdefault(h["chunk_id"], {**h, "rrf": 0.0, "dense": 0.0, "sparse": 0.0})
+            item["rrf"] += 1.0 / (60 + rank + 1)
+            item["dense"] = max(0.0, min(1.0, (h["score"] + 1.0) / 2.0))
+        max_sparse = max((h["score"] for h in sparse_hits), default=1.0) or 1.0
+        for rank, h in enumerate(sparse_hits):
+            item = merged.setdefault(h["chunk_id"], {**h, "rrf": 0.0, "dense": 0.0, "sparse": 0.0})
+            item["rrf"] += 1.0 / (60 + rank + 1)
+            item["sparse"] = max(0.0, min(1.0, h["score"] / max_sparse))
+        ranked = sorted(merged.values(), key=lambda x: -x["rrf"])[:k]
+        max_rrf = ranked[0]["rrf"] if ranked else 1.0
+        for i, item in enumerate(ranked):
+            item["score"] = round(item["rrf"] / max_rrf, 4)
+            item["rank"] = i + 1
+        return {
+            "query": query,
+            "mode": "hybrid",
+            "latency_ms": round((time.perf_counter() - t0) * 1000, 1),
+            "hits": ranked,
+        }
+
     def search_small2big(self, query: str, k: int = 8, k_children: int = 50) -> dict:
         """小块检索（精确性）→ 父块上下文（丰富性），按 parent 去重后返回 top-k。"""
         t0 = time.perf_counter()

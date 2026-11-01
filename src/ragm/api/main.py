@@ -25,6 +25,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from .. import __version__
 from ..classifier.factory import build_classifier
 from ..config import get_settings
+from ..rag.langgraph_service import LangGraphRagService
+from ..rag.llm import LLMClient
 from ..rag.service import DemoRagService
 from ..store.search_service import SearchService
 from .routes import router
@@ -57,14 +59,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         app.state.search = SearchService(settings)
         logger.info("search service ready: %s", app.state.search.info())
-    except Exception:  # noqa: BLE001
+    except Exception:
         app.state.search = None
         logger.warning("search service unavailable (embedding model / milvus)", exc_info=True)
-    logger.info(
-        "ragm api ready | backend=demo | milvus=%s | llm=%s",
-        settings.milvus_uri,
-        settings.llm_model,
-    )
+    if settings.rag_backend == "langgraph" and app.state.search is not None:
+        llm = LLMClient(settings.llm_base_url, settings.llm_model, settings.llm_api_key, settings.llm_temperature)
+        app.state.service = LangGraphRagService(app.state.classifier, app.state.search, llm, settings)
+        logger.info("rag backend=langgraph | llm=%s", settings.llm_model)
+    else:
+        logger.info("rag backend=demo | milvus=%s", settings.milvus_uri)
     yield
     logger.info("ragm api shutdown")
 

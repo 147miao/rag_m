@@ -73,9 +73,10 @@ curl -N -X POST http://127.0.0.1:8000/api/query/stream \
 
 - OpenAPI 文档：<http://127.0.0.1:8000/docs>
 - 契约定义：`src/ragm/api/schemas.py` ↔ `web/src/lib/types.ts`（字段一一对应；`Stats` 用 camelCase 别名序列化）
-- 服务层抽象：`src/ragm/rag/service.py` 定义 `RagService` Protocol；当前 `DemoRagService`（`served_by=demo`），接入 LangGraph 后新增实现即可，API 层不改
+- 服务层抽象：`src/ragm/rag/service.py` 定义 `RagService` Protocol；当前默认 `LangGraphRagService`（`served_by=langgraph`：分类 → hybrid 检索 → gemma4 生成 → 引用校验），Milvus/LLM 不可用时回退 `DemoRagService`
 - 路由分类器：`src/ragm/classifier/`（rules / prompt-llm / lora 三种后端）；当前默认 `CLASSIFIER_BACKEND=lora` + `CLASSIFIER_RUN_DIR=models/classifier/s1_06b_plain`（Qwen3-0.6B + SEQ_CLS LoRA，test_human macro-F1 0.898，36ms/条）
 - 进度监控：`make status`（或 `python scripts/status.py --watch 10`）、`GET /api/status`、前端顶栏训练徽章
+- 生成链路：LangGraph StateGraph（classify → retrieve → generate → verify），SSE 流式输出，详见 [docs/09-langgraph-generation.md](docs/09-langgraph-generation.md)
 - 检索索引：Milvus collection `rag_chunks`（40,019 chunks；embeddinggemma-300m 768 维 + BM25 sparse），详见 [docs/06-milvus-retrieval.md](docs/06-milvus-retrieval.md)
 - Small-to-big：`rag_children`（46,142 child）+ `parents.jsonl`（39,771 parent），`mode=small2big`；长文档 coverage 0.70→0.99，详见 [docs/08-small2big.md](docs/08-small2big.md)
 - 请求日志：`logs/api.jsonl`（request_id / method / path / status / elapsed_ms）

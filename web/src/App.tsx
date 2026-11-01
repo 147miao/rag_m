@@ -93,7 +93,10 @@ export default function App() {
     if (t === 'evidence' || t === 'graph' || t === 'trace' || t === 'debug') setTab(t)
     if (p.get('live') === '1') {
       // API 驱动的静态终态（截图/分享）：直接 POST /api/query，不做动画
-      postQuery({ question: initialDemo.question, route_override: 'auto' })
+      // ?q=<问题> 可覆盖默认演示问题（用于截图/回归）
+      const qParam = p.get('q')
+      if (qParam) setQuestion(qParam)
+      postQuery({ question: qParam || initialDemo.question, route_override: 'auto' })
         .then((resp) => {
           setResult(resp as unknown as Scenario)
           setPhase('done')

@@ -43,6 +43,13 @@ class Settings(BaseSettings):
     classifier_run_dir: Path | None = None
     classifier_threshold: float = 0.6
 
+    # ---- generation (langgraph) ----
+    rag_backend: str = "langgraph"  # langgraph | demo
+    rag_max_tokens: int = 1024
+    rag_top_k: int = 8
+    rag_multihop_k: int = 12
+    rag_agentic_k: int = 12
+
     # ---- retrieval ----
     top_k_dense: int = 50
     top_k_sparse: int = 50
