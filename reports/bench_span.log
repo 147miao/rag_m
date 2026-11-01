@@ -1,0 +1,13 @@
+Loading weights:   0%|          | 0/314 [00:00<?, ?it/s]Loading weights: 100%|██████████| 314/314 [00:00<00:00, 3271.32it/s]
+{"recall@5": 0.0, "recall@10": 0.0, "ndcg@10": 0.0, "mrr@10": 0.0, "axis": "reranker", "name": "none"}
+Loading weights:   0%|          | 0/201 [00:00<?, ?it/s]Loading weights:   4%|▍         | 9/201 [00:00<00:06, 31.12it/s]Loading weights: 100%|██████████| 201/201 [00:00<00:00, 686.37it/s]
+{"recall@5": 0.0, "recall@10": 0.0, "ndcg@10": 0.0, "mrr@10": 0.0, "axis": "reranker", "name": "bge-reranker-base"}
+Loading weights:   0%|          | 0/393 [00:00<?, ?it/s]Loading weights:   2%|▏         | 9/393 [00:00<00:40,  9.39it/s]Loading weights: 100%|██████████| 393/393 [00:00<00:00, 407.22it/s]
+{"recall@5": 0.0, "recall@10": 0.0, "ndcg@10": 0.0, "mrr@10": 0.0, "axis": "reranker", "name": "bge-reranker-v2-m3"}
+Loading weights:   0%|          | 0/310 [00:00<?, ?it/s]Loading weights:   0%|          | 1/310 [00:00<01:51,  2.77it/s]Loading weights:  17%|█▋        | 53/310 [00:00<00:01, 148.84it/s]Loading weights:  29%|██▊       | 89/310 [00:00<00:01, 209.50it/s]Loading weights:  39%|███▉      | 122/310 [00:00<00:00, 242.31it/s]Loading weights:  50%|█████     | 155/310 [00:00<00:00, 264.06it/s]Loading weights:  61%|██████    | 188/310 [00:00<00:00, 237.76it/s]Loading weights:  72%|███████▏  | 223/310 [00:01<00:00, 257.41it/s]Loading weights:  81%|████████▏ | 252/310 [00:01<00:00, 252.03it/s]Loading weights:  90%|█████████ | 280/310 [00:01<00:00, 255.98it/s]Loading weights:  99%|█████████▉| 308/310 [00:01<00:00, 245.39it/s]Loading weights: 100%|██████████| 310/310 [00:01<00:00, 217.94it/s]
+{"recall@5": 0.0, "recall@10": 0.0, "ndcg@10": 0.0, "mrr@10": 0.0, "axis": "reranker", "name": "qwen3-reranker-0.6b"}
+{"recall@5": 0.0188, "recall@10": 0.0352, "ndcg@10": 0.1225, "mrr@10": 0.3007, "axis": "chunk_size", "name": "200"}
+{"recall@5": 0.0558, "recall@10": 0.0901, "ndcg@10": 0.1715, "mrr@10": 0.4058, "axis": "chunk_size", "name": "400"}
+{"recall@5": 0.0981, "recall@10": 0.1394, "ndcg@10": 0.1919, "mrr@10": 0.4345, "axis": "chunk_size", "name": "800"}
+{"recall@5": 0.1966, "recall@10": 0.2834, "ndcg@10": 0.2755, "mrr@10": 0.4869, "axis": "chunk_size", "name": "1600"}
+saved
