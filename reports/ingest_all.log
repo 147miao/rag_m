@@ -1,0 +1,25 @@
+corpus: 42505 chunks | model=google/embeddinggemma-300m dim=768
+recreating collection ...
+Loading weights:   0%|          | 0/314 [00:00<?, ?it/s]Loading weights:   0%|          | 1/314 [00:00<02:16,  2.30it/s]Loading weights: 100%|██████████| 314/314 [00:00<00:00, 662.13it/s]
+embedder ready: dim=768
+  2048/42505 | 52.0 chunks/s | 39s
+  4096/42505 | 47.8 chunks/s | 86s
+  6144/42505 | 44.2 chunks/s | 139s
+  8192/42505 | 43.1 chunks/s | 190s
+  10240/42505 | 41.5 chunks/s | 246s
+  12288/42505 | 41.2 chunks/s | 298s
+  14336/42505 | 40.6 chunks/s | 353s
+  16384/42505 | 40.1 chunks/s | 409s
+  18432/42505 | 39.6 chunks/s | 465s
+  20480/42505 | 39.4 chunks/s | 520s
+  22528/42505 | 39.3 chunks/s | 573s
+  24576/42505 | 38.6 chunks/s | 637s
+  26624/42505 | 38.3 chunks/s | 696s
+  28672/42505 | 38.0 chunks/s | 754s
+  30720/42505 | 37.8 chunks/s | 812s
+  32768/42505 | 37.6 chunks/s | 872s
+  34816/42505 | 37.1 chunks/s | 937s
+  36864/42505 | 36.8 chunks/s | 1000s
+  38912/42505 | 35.3 chunks/s | 1103s
+  40960/42505 | 33.7 chunks/s | 1216s
+done: inserted=42505, collection rows=42505, elapsed=1295s

@@ -8,15 +8,23 @@ from ..api.schemas import GraphEdge, GraphNode, GraphPayload
 
 class KGStore:
     def __init__(self, uri: str, user: str, password: str, label: str = "Entity", relation: str = "CO_EVIDENCE") -> None:
-        self.label = label
-        self.relation = relation
+        labels = [x.strip() for x in label.split(",") if x.strip()]
+        rels = [x.strip() for x in relation.split(",") if x.strip()]
+        if len(rels) == 1 and len(labels) > 1:
+            rels = rels * len(labels)
+        self.specs = list(zip(labels, rels)) or [("Entity", "CO_EVIDENCE")]
+        self.label = labels[0] if labels else "Entity"
+        self.relation = rels[0] if rels else "CO_EVIDENCE"
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
         self.names: list[str] = []
         self.name_set: set[str] = set()
 
     def load(self) -> int:
         with self.driver.session() as s:
-            self.names = [r["n"] for r in s.run(f"MATCH (e:{self.label}) RETURN e.name AS n")]
+            names: list[str] = []
+            for label, _rel in self.specs:
+                names.extend(r["n"] for r in s.run(f"MATCH (e:{label}) RETURN e.name AS n"))
+            self.names = list(dict.fromkeys(names))
         self.name_set = set(self.names)
         return len(self.names)
 
@@ -46,14 +54,18 @@ class KGStore:
     def expand(self, names: list[str], limit: int = 40) -> tuple[list[dict], list[str]]:
         if not names:
             return [], []
-        cypher = (
-            f"MATCH (a:{self.label})-[r:{self.relation}]-(b:{self.label}) "
-            "WHERE a.name IN $names "
-            "RETURN a.name AS a, b.name AS b, r.qid AS qid, r.qtype AS qtype, r.question AS question "
-            "LIMIT $limit"
-        )
+        rows: list[dict] = []
         with self.driver.session() as s:
-            rows = [dict(rec) for rec in s.run(cypher, names=names, limit=limit)]
+            for label, rel in self.specs:
+                cypher = (
+                    f"MATCH (a:{label})-[r:{rel}]-(b:{label}) "
+                    "WHERE a.name IN $names "
+                    "RETURN a.name AS a, b.name AS b, r.qid AS qid, r.qtype AS qtype, r.question AS question "
+                    "LIMIT $limit"
+                )
+                rows.extend(dict(rec) for rec in s.run(cypher, names=names, limit=limit))
+                if len(rows) >= limit:
+                    break
         neighbors: list[str] = []
         for r in rows:
             if r["b"] not in names and r["b"] not in neighbors:

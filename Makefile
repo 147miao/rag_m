@@ -51,6 +51,18 @@ health: ## 检查 Milvus 健康状态
 status: ## 打印实验进度看板（--watch 10 可实时刷新）
 	$(UV) run python scripts/status.py $(if $(WATCH),--watch $(WATCH),)
 
+use-all: ## 切换 API 到全量语料（演示+火影+论文）
+	scripts/use_corpus.sh all
+
+use-default: ## 切换 API 到默认演示语料（HotpotQA+CMRC）
+	scripts/use_corpus.sh default
+
+use-naruto: ## 切换 API 到火影语料
+	scripts/use_corpus.sh naruto
+
+use-papers: ## 切换 API 到 arXiv 论文语料
+	scripts/use_corpus.sh papers
+
 api: ## 启动 FastAPI（http://127.0.0.1:8000）
 	$(UV) run uvicorn ragm.api.main:app --host 127.0.0.1 --port 8000
 

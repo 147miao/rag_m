@@ -6,7 +6,7 @@
 - 技术栈：LangGraph 1.2 · Milvus 3.0 · Neo4j 5 · FastAPI · React 19 · Docker · Ollama（或任意 OpenAI 兼容 LLM）
 - 分类器：Qwen3-0.6B + SEQ_CLS LoRA（500 条人工裁决测试集 macro-F1 0.898）
 - 检索：embeddinggemma-300m + Milvus 3.0 BM25 混合检索 + bge-reranker-base 重排
-- 已实测语料：HotpotQA / CMRC 演示语料、萌娘百科火影忍者 220 篇、arXiv RAG 论文 8 篇
+- 已实测语料：HotpotQA / CMRC 演示语料、萌娘百科火影忍者 220 篇、arXiv RAG 论文 8 篇（可用 `make use-all` 合并为一个索引一次检索）
 
 ---
 
@@ -94,6 +94,7 @@ make up-all                   # 可选：Milvus + Neo4j + SearXNG（web_search �
 
 ```bash
 make api        # FastAPI  http://127.0.0.1:8000
+make use-all    # 可选：把 API 切到「演示+火影+论文」合并语料
 make web        # 前端 dev http://127.0.0.1:5173
 make health     # 检查 Milvus 健康
 curl -s http://127.0.0.1:8000/api/health   # 应用健康检查
@@ -162,10 +163,10 @@ curl -N -X POST localhost:8000/api/query/stream -H "Content-Type: application/js
 | 萌娘百科火影忍者 | 220 篇 / 117 万字 → 1,782 chunks + 7,434 children | 真实网页文档测试 |
 | arXiv RAG 论文 | 8 篇 PDF → 6 篇有效 / 704 chunks + 3,072 children | 真实长文档测试 |
 
-Milvus 集合（按实验开）：`rag_chunks`（40k）、`rag_children`（46k）、`rag_naruto_chunks/children`、
+Milvus 集合（按实验开）：`rag_all_chunks`（42,505，三语料合并）、`rag_chunks`（40k）、`rag_children`（46k）、`rag_naruto_chunks/children`、
 `rag_papers_chunks/children`、`rag_long_*`（small-to-big 对照），以及评测用 `nr_emb_*` / `nr_chunk_*`。
 
-Neo4j 图谱：HotpotQA `Entity/CO_EVIDENCE`（105,570 节点 / 180,894 边）、火影 `NarutoEntity/MENTIONS`（218 节点 / 12,190 边）。
+Neo4j 图谱：HotpotQA `Entity/CO_EVIDENCE`（105,570 节点 / 180,894 边）、火影 `NarutoEntity/MENTIONS`（218 节点 / 12,190 边）；多图谱模式会同时加载并合并为 105,788 个实体。
 
 ## 七、实验结果摘要
 
@@ -254,6 +255,8 @@ rag_m/
 | `scripts/eval_retrieval_milvus.py` / `eval_graph_rag.py` / `eval_generation_v2.py` | 检索 / 图谱 / 生成质量评测 |
 | `scripts/bench_all.py` | 并行基准编排（GPU 锁 + 利用率监控） |
 | `scripts/status.py` | 训练/实验进度看板 |
+| `scripts/use_corpus.sh` | 切换知识库：`default` / `naruto` / `papers` / `all`（`make use-all` 等） |
+| `scripts/test_all_corpus.py` / `eval_all_dilution.py` | 全量索引跨语料问答与检索稀释评估 |
 
 ## 十、前端
 
