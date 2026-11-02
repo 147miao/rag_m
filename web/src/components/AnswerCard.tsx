@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { Scenario } from '../lib/types'
 import { ROUTE_META } from '../lib/types'
 import { Icon, RouteBadge, fmtCost, fmtMs } from './ui'
@@ -33,6 +34,7 @@ export function AnswerCard({
   onCite,
   onRerun,
   onCopy,
+  onFeedback,
 }: {
   scenario: Scenario
   question: string
@@ -41,9 +43,11 @@ export function AnswerCard({
   onCite: (n: number) => void
   onRerun: () => void
   onCopy: () => void
+  onFeedback?: (rating: 'up' | 'down') => void
 }) {
   const meta = ROUTE_META[scenario.route]
   const showBody = phase === 'streaming' || phase === 'done'
+  const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
 
   return (
     <article className="card overflow-hidden">
@@ -137,6 +141,12 @@ export function AnswerCard({
             <span className="num ml-2 text-[10.5px] text-faint">校验 {scenario.stats.citationCheck}</span>
 
             <div className="ml-auto flex items-center gap-1">
+              {onFeedback && (
+                <>
+                  <button type="button" onClick={() => { setFeedback('up'); onFeedback?.('up') }} disabled={feedback !== null} className="rounded border px-2 py-1 text-[10.5px] text-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50" style={{ borderColor: 'var(--color-line)' }} title="答案有帮助">{feedback === 'up' ? '已反馈' : '有帮助'}</button>
+                  <button type="button" onClick={() => { setFeedback('down'); onFeedback?.('down') }} disabled={feedback !== null} className="rounded border px-2 py-1 text-[10.5px] text-muted transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-50" style={{ borderColor: 'var(--color-line)' }} title="答案没帮助">{feedback === 'down' ? '已反馈' : '没帮助'}</button>
+                </>
+              )}
               <IconButton icon="copy" label="复制答案" onClick={onCopy} />
               <IconButton icon="refresh" label="重新生成" onClick={onRerun} />
             </div>

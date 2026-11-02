@@ -15,6 +15,7 @@ from fastapi.responses import StreamingResponse
 from .. import __version__
 from ..config import get_settings
 from ..ops.status import collect_status
+from .examples import examples_for
 from .schemas import (
     ClassifierInfo,
     DoneEvent,
@@ -146,6 +147,20 @@ async def list_scenarios(request: Request) -> list[ScenarioSummary]:
 
 
 # ---------- query ----------
+@router.get("/examples", summary="示例问题（按当前语料库）")
+async def examples() -> list[dict]:
+    return examples_for(get_settings().milvus_collection)
+
+
+@router.get("/classifier/metrics", summary="分类器评测指标")
+async def classifier_metrics() -> dict:
+    path = Path(__file__).resolve().parents[3] / "reports" / "classifier_metrics.json"
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return {"n": 0, "accuracy": None, "macro_f1": None, "note": "metrics unavailable"}
+
+
 @router.post("/route", response_model=RouteResponse, summary="只做查询路由分类")
 async def route(req: RouteRequest, request: Request) -> RouteResponse:
     return RouteResponse(**_classify(request, req.question).model_dump())

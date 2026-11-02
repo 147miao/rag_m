@@ -265,9 +265,9 @@ rag_m/
 - 开发：`cd web && pnpm install && pnpm dev`；构建：`pnpm build`（FastAPI 自动托管 `web/dist`）；
 - 深链：`?demo=<id>&tab=evidence|graph|trace|debug&run=1&fast=1&live=1&q=<问题>&route=<route>`。
 
-![检索控制台](docs/screenshots/11-langgraph-live.png)
+![检索控制台](docs/screenshots/16-ui-live-answer.png)
 
-![Graph RAG 图谱面板](docs/screenshots/12-graph-rag.png)
+![空状态](docs/screenshots/15-ui-empty-live.png)
 
 ## 十一、已知限制
 

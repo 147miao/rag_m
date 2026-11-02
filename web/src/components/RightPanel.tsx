@@ -2,6 +2,14 @@ import type { Evidence, GraphEdge, GraphNode, Scenario, ToolCall } from '../lib/
 import { ROUTE_META } from '../lib/types'
 import { Icon } from './ui'
 
+const JUNK = [/^跳转到正文\s*\/\s*Skip to content\s*/i, /清除页面缓存/g, /简体（中国）/g, /\s*欢迎正在阅读这个条目的您协助编辑本条目。/g, /请阅读Wiki入门或条目编辑规范，并查找相关资料。/g, /萌娘百科带您[^。]*。/g]
+
+function cleanEvidence(text: string): string {
+  let out = text || ''
+  for (const re of JUNK) out = out.replace(re, '')
+  return out.trim()
+}
+
 type Tab = 'evidence' | 'graph' | 'trace' | 'debug'
 
 export function RightPanel({
@@ -13,7 +21,7 @@ export function RightPanel({
   visible,
   onClose,
 }: {
-  scenario: Scenario
+  scenario: Scenario | null
   tab: Tab
   onTab: (t: Tab) => void
   focus: number | null
@@ -21,6 +29,23 @@ export function RightPanel({
   visible: boolean
   onClose: () => void
 }) {
+  if (!scenario) {
+    return (
+      <aside
+        className={
+          'z-40 flex w-[400px] shrink-0 flex-col border-l bg-paper ' +
+          (visible ? 'fixed inset-y-0 right-0 shadow-2xl xl:static xl:shadow-none' : 'hidden xl:flex')
+        }
+        style={{ borderColor: 'var(--color-line)' }}
+        aria-label="证据面板"
+      >
+        <div className="flex flex-1 flex-col items-center justify-center gap-2 px-8 text-center">
+          <p className="text-[12px] text-muted">运行一次查询后，这里会显示证据、图谱与轨迹。</p>
+          <p className="text-[10.5px] text-faint">支持按引用编号定位证据条目。</p>
+        </div>
+      </aside>
+    )
+  }
   const meta = ROUTE_META[scenario.route]
   const tabs: { key: Tab; label: string; count?: number }[] = [
     { key: 'evidence', label: '证据', count: scenario.evidence.length },
@@ -181,7 +206,7 @@ function EvidenceCard({ evidence, color, active, onClick }: { evidence: Evidence
       </div>
 
       <p className="mt-2 line-clamp-3 text-[11.5px] leading-relaxed text-ink-2">
-        {evidence.highlight ? highlight(evidence.snippet, evidence.highlight) : evidence.snippet}
+        {evidence.highlight ? highlight(cleanEvidence(evidence.snippet), evidence.highlight) : cleanEvidence(evidence.snippet)}
       </p>
 
       <div className="mt-2 flex items-center gap-2">

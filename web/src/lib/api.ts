@@ -161,3 +161,32 @@ export interface StatusResponse {
 export function fetchStatus(signal?: AbortSignal): Promise<StatusResponse> {
   return request<StatusResponse>('/api/status', { signal })
 }
+
+export interface Example {
+  id: string
+  question: string
+  route: Route
+  hint: string
+}
+
+export interface ClassifierMetrics {
+  run: string
+  backend: string
+  test_set: string
+  n: number
+  accuracy: number
+  macro_f1: number
+  p50_ms: number
+  p95_ms?: number
+  note?: string
+}
+
+export function fetchExamples(signal?: AbortSignal): Promise<Example[]> {
+  return request<Example[]>('/api/examples', { signal })
+}
+
+export function fetchClassifierMetrics(signal?: AbortSignal): Promise<ClassifierMetrics> {
+  return request<ClassifierMetrics>('/api/classifier/metrics', { signal })
+}
+
+
