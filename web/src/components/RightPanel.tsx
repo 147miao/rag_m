@@ -33,7 +33,7 @@ export function RightPanel({
     return (
       <aside
         className={
-          'z-40 flex w-[400px] shrink-0 flex-col border-l bg-paper ' +
+          'z-40 flex w-full max-w-[400px] shrink-0 flex-col border-l bg-paper ' +
           (visible ? 'fixed inset-y-0 right-0 shadow-2xl xl:static xl:shadow-none' : 'hidden xl:flex')
         }
         style={{ borderColor: 'var(--color-line)' }}

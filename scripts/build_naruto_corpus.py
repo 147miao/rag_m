@@ -5,7 +5,7 @@ import hashlib
 import json
 from pathlib import Path
 
-RAW = Path('/run/media/myj/D/rag_m/data/naruto/moegirl.jsonl')
+RAW = Path('/run/media/myj/D/rag_m/data/naruto/moegirl_clean.jsonl')
 OUT = Path('/run/media/myj/D/rag_m/data/naruto')
 PARENT_MAX = 1600
 CHILD = 200

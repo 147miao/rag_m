@@ -58,6 +58,12 @@ class MilvusStore:
     def flush(self) -> None:
         self.client.flush(self.collection)
 
+    def delete_by_filter(self, expr: str) -> int:
+        """按标量条件删除（用于语料局部更新）。"""
+        res = self.client.delete(collection_name=self.collection, filter=expr)
+        self.client.flush(self.collection)
+        return int(getattr(res, "delete_count", 0) or 0)
+
     def count(self) -> int:
         stats = self.client.get_collection_stats(self.collection)
         return int(stats.get("row_count", 0))

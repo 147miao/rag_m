@@ -160,10 +160,10 @@ curl -N -X POST localhost:8000/api/query/stream -H "Content-Type: application/js
 | 语料 | 规模 | 用途 |
 |---|---|---|
 | HotpotQA + CMRC 演示语料 | 40,019 chunks | 默认索引，演示三路问答 |
-| 萌娘百科火影忍者 | 220 篇 / 117 万字 → 1,782 chunks + 7,434 children | 真实网页文档测试 |
+| 萌娘百科火影忍者（清洗后） | 204 篇 / 71 万字 → 1,112 chunks + 4,548 children | 真实网页文档测试 |
 | arXiv RAG 论文 | 8 篇 PDF → 6 篇有效 / 704 chunks + 3,072 children | 真实长文档测试 |
 
-Milvus 集合（按实验开）：`rag_all_chunks`（42,505，三语料合并）、`rag_chunks`（40k）、`rag_children`（46k）、`rag_naruto_chunks/children`、
+Milvus 集合（按实验开）：`rag_all_chunks`（41,835，三语料合并，火影已清洗）、`rag_chunks`（40k）、`rag_children`（46k）、`rag_naruto_chunks/children`、
 `rag_papers_chunks/children`、`rag_long_*`（small-to-big 对照），以及评测用 `nr_emb_*` / `nr_chunk_*`。
 
 Neo4j 图谱：HotpotQA `Entity/CO_EVIDENCE`（105,570 节点 / 180,894 边）、火影 `NarutoEntity/MENTIONS`（218 节点 / 12,190 边）；多图谱模式会同时加载并合并为 105,788 个实体。
@@ -210,7 +210,7 @@ Neo4j 图谱：HotpotQA `Entity/CO_EVIDENCE`（105,570 节点 / 180,894 边）�
 
 ### 7.5 真实文档
 
-- 火影语料（220 篇）：事实型 16/18、多跳型 12/12，引用 100% 有效；
+- 火影语料（清洗后 204 篇）：事实型 17/18、多跳型 12/12，引用 100% 有效；
 - arXiv 论文（6 篇）：10 道 RAG 领域问题 9/10 正确，p50 1.07s；
 - Small-to-Big（PubMedQA 长文档）：约 5.5k 上下文字符下证据覆盖率 0.70 → 0.99。
 
@@ -255,6 +255,7 @@ rag_m/
 | `scripts/eval_retrieval_milvus.py` / `eval_graph_rag.py` / `eval_generation_v2.py` | 检索 / 图谱 / 生成质量评测 |
 | `scripts/bench_all.py` | 并行基准编排（GPU 锁 + 利用率监控） |
 | `scripts/status.py` | 训练/实验进度看板 |
+| `scripts/clean_naruto.py` / `update_all_corpus.py` | 萌娘语料清洗与全量索引局部更新 |
 | `scripts/use_corpus.sh` | 切换知识库：`default` / `naruto` / `papers` / `all`（`make use-all` 等） |
 | `scripts/test_all_corpus.py` / `eval_all_dilution.py` | 全量索引跨语料问答与检索稀释评估 |
 
@@ -268,6 +269,8 @@ rag_m/
 ![检索控制台](docs/screenshots/16-ui-live-answer.png)
 
 ![空状态](docs/screenshots/15-ui-empty-live.png)
+
+![移动端](docs/screenshots/17-ui-mobile.png)
 
 ## 十一、已知限制
 

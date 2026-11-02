@@ -1,29 +1,46 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import type { Scenario } from '../lib/types'
 import { ROUTE_META } from '../lib/types'
 import { Icon, RouteBadge, fmtCost, fmtMs } from './ui'
 
 function renderWithCitations(text: string, onCite: (n: number) => void) {
   const parts = text.split(/(\[\d+\])/g)
-  return parts.map((p, i) => {
+  const out: ReactNode[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const p = parts[i]
     const m = p.match(/^\[(\d+)\]$/)
-    if (m) {
-      const n = Number(m[1])
-      return (
-        <button
-          key={i}
-          type="button"
-          onClick={() => onCite(n)}
-          className="num mx-0.5 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-[3px] border px-1 align-[2px] text-[9.5px] leading-none transition-colors hover:bg-teal-soft"
-          style={{ borderColor: 'var(--color-line-strong)', color: 'var(--color-teal)' }}
-          title={'查看证据 ' + n}
-        >
-          {n}
-        </button>
-      )
+    if (!m) {
+      out.push(<span key={i}>{p}</span>)
+      continue
     }
-    return <span key={i}>{p}</span>
-  })
+    const n = Number(m[1])
+    const badge = (
+      <button
+        type="button"
+        onClick={() => onCite(n)}
+        className="num mx-0.5 inline-flex h-[16px] min-w-[16px] items-center justify-center rounded-[3px] border px-1 align-[2px] text-[9.5px] leading-none transition-colors hover:bg-teal-soft"
+        style={{ borderColor: 'var(--color-line-strong)', color: 'var(--color-teal)' }}
+        title={'查看证据 ' + n}
+      >
+        {n}
+      </button>
+    )
+    // 引用后紧跟标点时绑定在一起，避免移动端换行成孤立的「。」行
+    const next = parts[i + 1]
+    if (next && /^[。，、；：！？]/.test(next)) {
+      out.push(
+        <span key={i} className="whitespace-nowrap">
+          {badge}
+          {next[0]}
+        </span>,
+      )
+      parts[i + 1] = next.slice(1)
+    } else {
+      out.push(<span key={i}>{badge}</span>)
+    }
+  }
+  return out
 }
 
 export function AnswerCard({
