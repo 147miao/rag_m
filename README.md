@@ -262,6 +262,10 @@ rag_m/
 - 开发：`cd web && pnpm install && pnpm dev`；构建：`pnpm build`（FastAPI 自动托管 `web/dist`）；
 - 深链：`?demo=<id>&tab=evidence|graph|trace|debug&run=1&fast=1&live=1&q=<问题>&route=<route>`。
 
+![检索控制台](docs/screenshots/11-langgraph-live.png)
+
+![Graph RAG 图谱面板](docs/screenshots/12-graph-rag.png)
+
 ## 十一、已知限制
 
 1. 语料以演示/公开百科为主，尚未接入生产文档；`docs/17` 中火影 chunk-size 矩阵存在数据构造 bug，正在修复；
