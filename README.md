@@ -310,6 +310,8 @@ rag_m/
 | [docs/12-reranker.md](docs/12-reranker.md) / [13](docs/13-generation-eval.md) / [14](docs/14-generation-eval-v2.md) / [15](docs/15-rerank-generation-eval.md) | reranker 与生成质量评测 |
 | [docs/16-naruto-real-docs.md](docs/16-naruto-real-docs.md) / [17](docs/17-naruto-matrix.md) | 真实文档测试与横向矩阵 |
 | [docs/18-bench-speed-and-papers.md](docs/18-bench-speed-and-papers.md) | 测试加速与 arXiv 长文档 |
+| [docs/20-frontend-live.md](docs/20-frontend-live.md) | 前端去演示化与移动端修复 |
+| [docs/21-project-explained.md](docs/21-project-explained.md) | **项目详解：语言基础 + 外部库基础 + 理论基础（长文）** |
 
 ## 十五、致谢
 
