@@ -88,7 +88,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 logger.warning("reranker unavailable", exc_info=True)
         llm = LLMClient(settings.llm_base_url, settings.llm_model, settings.llm_api_key, settings.llm_temperature)
         executor = ToolExecutor(app.state.search, app.state.kg, settings)
-        agent = AgentGraph(llm, executor, max_iterations=settings.agent_max_iterations, max_tokens=settings.rag_max_tokens)
+        agent = AgentGraph(
+            llm,
+            executor,
+            max_iterations=settings.agent_max_iterations,
+            max_tokens=settings.rag_max_tokens,
+            max_calls=settings.agent_max_calls,
+            total_tokens=settings.agent_max_tokens,
+            retry=settings.agent_retry,
+        )
         app.state.service = LangGraphRagService(
             app.state.classifier, app.state.search, llm, settings, kg=app.state.kg, agent=agent, executor=executor, reranker=reranker
         )

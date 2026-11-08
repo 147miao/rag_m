@@ -63,6 +63,9 @@ class LangGraphRagService:
             top_k=settings.rag_top_k,
             multihop_k=settings.rag_multihop_k,
             agentic_k=settings.rag_agentic_k,
+            kg_hops=settings.graph_max_hops,
+            kg_limit=settings.graph_hop_limit,
+            kg_iterative=settings.graph_iterative,
         )
 
     # ---------- scenarios ----------

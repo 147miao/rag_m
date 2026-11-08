@@ -44,8 +44,8 @@ agentic 路由则走 `plan → tools → plan … → synthesize → verify` 的
 | 混合检索 | dense（embeddinggemma-300m）+ BM25（Milvus 3.0 Function）+ RRF 融合 |
 | 重排 | bge-reranker-base，hybrid top-20 → 重排 → top-k |
 | Small-to-Big | 小块检索（200 字）+ 大块上下文（父块/整篇），长文档覆盖率 0.70 → 0.99 |
-| Graph RAG | Neo4j 实体图；多跳题实体链接 → 1 跳扩展 → 邻居证据（HotpotQA gold 召回 0.875 → 1.0） |
-| Agentic | 工具循环（vector_search / kg_query / web_search），最多 2 轮，工具结果并入引用证据 |
+| Graph RAG | Neo4j 实体图；多跳题实体链接 → 2 跳扩展（可选迭代检索）→ 邻居证据 |
+| Agentic | 工具循环（vector_search / kg_query / web_search），工具预算 4 次/8000 tokens + 失败重试 |
 | 引用校验 | 答案中的 [n] 编号对证据范围校验，返回 `n/m 通过` |
 | 流式输出 | SSE：`stage`（路由/检索/重排/生成）→ `token`（逐字）→ `done`（完整响应） |
 | 可观测性 | LangSmith 可选接入（LLM/检索/工具/Graph 节点 span），未配置时自动关闭 |

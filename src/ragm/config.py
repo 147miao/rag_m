@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     neo4j_uri: str = "bolt://127.0.0.1:7687"
     neo4j_user: str = "neo4j"
     neo4j_password: str = "ragm-local-dev"
+    graph_max_hops: int = 2
+    graph_hop_limit: int = 40
+    graph_iterative: bool = True
     kg_label: str = "Entity"
     kg_relation: str = "CO_EVIDENCE"
 
@@ -59,6 +62,9 @@ class Settings(BaseSettings):
 
     # ---- agentic ----
     agent_max_iterations: int = 2
+    agent_max_calls: int = 4
+    agent_max_tokens: int = 8000
+    agent_retry: int = 1
     web_search_url: str = "http://127.0.0.1:8080/search"
     web_search_k: int = 5
 

@@ -50,11 +50,24 @@ class AgentState(TypedDict, total=False):
 
 
 class AgentGraph:
-    def __init__(self, llm: LLMClient, executor: ToolExecutor, *, max_iterations: int = 3, max_tokens: int = 1024) -> None:
+    def __init__(
+        self,
+        llm: LLMClient,
+        executor: ToolExecutor,
+        *,
+        max_iterations: int = 3,
+        max_tokens: int = 1024,
+        max_calls: int = 4,
+        total_tokens: int = 8000,
+        retry: int = 1,
+    ) -> None:
         self.llm = llm
         self.executor = executor
         self.max_iterations = max_iterations
         self.max_tokens = max_tokens
+        self.max_calls = max_calls
+        self.total_tokens = total_tokens
+        self.retry = retry
         self._graph = self._build()
 
     # ---------- nodes ----------
@@ -99,7 +112,15 @@ class AgentGraph:
                 args = json.loads(fn.get("arguments") or "{}")
             except json.JSONDecodeError:
                 args = {}
-            result = self.executor.run(name, args)
+            result = None
+            attempts = 0
+            for attempt in range(self.retry + 1):
+                attempts = attempt + 1
+                result = self.executor.run(name, args)
+                if result.get("ok") or attempt >= self.retry:
+                    break
+                time.sleep(0.3)
+            assert result is not None
             messages.append({"role": "tool", "tool_call_id": call.get("id"), "content": tool_result_text(result)})
             tool_log.append(
                 {
@@ -108,6 +129,7 @@ class AgentGraph:
                     "result": (result.get("note") or f"{len(result.get('hits') or result.get('results') or result.get('paths') or [])} 条结果"),
                     "ms": int(result.get("latency_ms") or 0),
                     "status": "ok" if result.get("ok") else "error",
+                    "attempts": attempts,
                 }
             )
             names.append(name)
@@ -183,7 +205,14 @@ class AgentGraph:
     def _route_after_plan(self, state: AgentState) -> str:
         messages = state.get("messages") or []
         last = messages[-1] if messages else {}
-        if last.get("tool_calls") and int(state.get("iterations") or 0) < self.max_iterations:
+        calls = len(state.get("tool_names") or [])
+        used = int(state.get("tokens_in") or 0) + int(state.get("tokens_out") or 0)
+        if (
+            last.get("tool_calls")
+            and int(state.get("iterations") or 0) < self.max_iterations
+            and calls < self.max_calls
+            and used < self.total_tokens
+        ):
             return "tools"
         return "synthesize"
 

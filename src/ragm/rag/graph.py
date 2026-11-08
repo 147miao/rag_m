@@ -96,6 +96,9 @@ class RagGraph:
         top_k: int = 8,
         multihop_k: int = 12,
         agentic_k: int = 12,
+        kg_hops: int = 2,
+        kg_limit: int = 40,
+        kg_iterative: bool = True,
     ) -> None:
         self.classifier = classifier
         self.search = search
@@ -107,6 +110,9 @@ class RagGraph:
         self.top_k = top_k
         self.multihop_k = multihop_k
         self.agentic_k = agentic_k
+        self.kg_hops = kg_hops
+        self.kg_limit = kg_limit
+        self.kg_iterative = kg_iterative
         self._graph = self._build()
 
     # ---------- nodes ----------
@@ -133,9 +139,10 @@ class RagGraph:
         kg_payload = None
         kg_seeds: list[str] = []
         graph_added = 0
+        iter_added = 0
         if self.kg is not None and route == "multihop":
             kg_seeds = self.kg.link(state["question"], [h.get("title") or "" for h in hits])
-            edges, neighbors = self.kg.expand(kg_seeds, limit=40)
+            edges, neighbors = self.kg.expand_hops(kg_seeds, hops=self.kg_hops, limit=self.kg_limit)
             titles = [n for n in neighbors if n not in kg_seeds][:12]
             graph_chunks = self.search.chunks_by_titles(titles, limit=8)
             existing = {h["chunk_id"] for h in hits}
@@ -146,6 +153,13 @@ class RagGraph:
                 extra.append({**gc, "score": 0.5, "dense": 0.0, "sparse": 0.0, "graph": True})
                 existing.add(gc["chunk_id"])
             graph_added = len(extra)
+            if self.kg_iterative and not extra and neighbors:
+                res2 = self.search.search_with_scores(state["question"] + " " + " ".join(neighbors[:3]), k=k)
+                existing2 = {h["chunk_id"] for h in hits}
+                more = [h for h in res2["hits"] if h["chunk_id"] not in existing2]
+                if more:
+                    iter_added = len(more[:4])
+                    hits = (more[:4] + hits)[: k + 4]
             hits = (extra + hits)[: k + 4]
             kg_paths = edges[:20]
             if kg_seeds:
@@ -158,6 +172,8 @@ class RagGraph:
         detail = f"dense + BM25 · RRF · top {len(hits)}"
         if graph_added:
             detail += f" · 图谱 +{graph_added}"
+        if iter_added:
+            detail += f" · 迭代 +{iter_added}"
         if rerank_ms is not None:
             detail += f" · 重排 {self.reranker.name}"
         return {

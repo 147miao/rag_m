@@ -52,24 +52,49 @@ class KGStore:
 
     # ---------- 邻域扩展 ----------
     def expand(self, names: list[str], limit: int = 40) -> tuple[list[dict], list[str]]:
+        return self.expand_hops(names, hops=1, limit=limit)
+
+    def expand_hops(self, names: list[str], hops: int = 2, limit: int = 40) -> tuple[list[dict], list[str]]:
+        """多跳邻域扩展：逐跳 BFS，返回带 hop 字段的边与新发现的邻居。"""
         if not names:
             return [], []
+        frontier = list(dict.fromkeys(names))
         rows: list[dict] = []
-        with self.driver.session() as s:
-            for label, rel in self.specs:
-                cypher = (
-                    f"MATCH (a:{label})-[r:{rel}]-(b:{label}) "
-                    "WHERE a.name IN $names "
-                    "RETURN a.name AS a, b.name AS b, r.qid AS qid, r.qtype AS qtype, r.question AS question "
-                    "LIMIT $limit"
-                )
-                rows.extend(dict(rec) for rec in s.run(cypher, names=names, limit=limit))
-                if len(rows) >= limit:
-                    break
         neighbors: list[str] = []
-        for r in rows:
-            if r["b"] not in names and r["b"] not in neighbors:
-                neighbors.append(r["b"])
+        seen_edges: set[tuple] = set()
+        seen_names = set(names)
+        hops = max(1, hops)
+        per_hop = max(5, limit // hops)
+        with self.driver.session() as s:
+            for hop in range(1, hops + 1):
+                hop_rows: list[dict] = []
+                for label, rel in self.specs:
+                    cypher = (
+                        f"MATCH (a:{label})-[r:{rel}]-(b:{label}) "
+                        "WHERE a.name IN $names "
+                        "RETURN a.name AS a, b.name AS b, r.qid AS qid, r.qtype AS qtype, r.question AS question "
+                        "LIMIT $limit"
+                    )
+                    hop_rows.extend(dict(rec) for rec in s.run(cypher, names=frontier, limit=per_hop * 3))
+                next_frontier: list[str] = []
+                hop_count = 0
+                for r in hop_rows:
+                    key = (r["a"], r["b"], r.get("qid"))
+                    if key in seen_edges:
+                        continue
+                    seen_edges.add(key)
+                    r["hop"] = hop
+                    rows.append(r)
+                    if r["b"] not in seen_names:
+                        seen_names.add(r["b"])
+                        neighbors.append(r["b"])
+                        next_frontier.append(r["b"])
+                    hop_count += 1
+                    if hop_count >= per_hop or len(rows) >= limit:
+                        break
+                if len(rows) >= limit or not next_frontier:
+                    break
+                frontier = list(dict.fromkeys(next_frontier))[:20]
         return rows, neighbors
 
     # ---------- 图数据（前端 Graph 面板） ----------
