@@ -107,7 +107,7 @@ def read_epub(path: Path) -> list[Section]:
         for name in names:
             try:
                 html = zf.read(name).decode("utf-8", "ignore")
-            except Exception:  # noqa: BLE001
+            except Exception:
                 logger.warning("epub chapter decode failed: %s", name, exc_info=True)
                 continue
             out.extend(_html_sections(html, Path(name).stem))

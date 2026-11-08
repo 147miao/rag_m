@@ -38,7 +38,7 @@ def load_manifest(out: Path) -> dict:
     if path.exists():
         try:
             return json.loads(path.read_text(encoding="utf-8"))
-        except Exception:  # noqa: BLE001
+        except Exception:
             logger.warning("manifest unreadable, rebuilding: %s", path, exc_info=True)
     return {"version": 1, "files": {}}
 
