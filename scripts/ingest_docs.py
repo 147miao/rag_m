@@ -14,7 +14,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from ragm.ingest.pipeline import build  # noqa: E402
+from ragm.ingest.pipeline import build
 
 
 def main() -> None:

@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 
-from .chunker import build_rows, doc_id_for, sha1
+from .chunker import build_rows, doc_id_for
 from .readers import SUPPORTED, read_file
+
+logger = logging.getLogger(__name__)
 
 MANIFEST = "manifest.json"
 ROWS_DIR = "rows"
@@ -36,7 +39,7 @@ def load_manifest(out: Path) -> dict:
         try:
             return json.loads(path.read_text(encoding="utf-8"))
         except Exception:  # noqa: BLE001
-            pass
+            logger.warning("manifest unreadable, rebuilding: %s", path, exc_info=True)
     return {"version": 1, "files": {}}
 
 

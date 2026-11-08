@@ -1,6 +1,7 @@
 """文档读取：PDF / DOCX / EPUB / Markdown / HTML / TXT → 章节列表。"""
 from __future__ import annotations
 
+import logging
 import re
 import zipfile
 from dataclasses import dataclass, field
@@ -9,6 +10,8 @@ from pathlib import Path
 from bs4 import BeautifulSoup
 from docx import Document
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
 
 SUPPORTED = {".pdf", ".docx", ".epub", ".md", ".markdown", ".txt", ".html", ".htm"}
 
@@ -105,9 +108,9 @@ def read_epub(path: Path) -> list[Section]:
             try:
                 html = zf.read(name).decode("utf-8", "ignore")
             except Exception:  # noqa: BLE001
+                logger.warning("epub chapter decode failed: %s", name, exc_info=True)
                 continue
-            for sec in _html_sections(html, Path(name).stem):
-                out.append(sec)
+            out.extend(_html_sections(html, Path(name).stem))
     return out
 
 

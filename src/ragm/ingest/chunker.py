@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import hashlib
-from pathlib import Path
 
 from .readers import Section
 
@@ -46,7 +45,6 @@ def build_rows(
     parents: list[dict] = []
     children: list[dict] = []
     chunks: list[dict] = []
-    title = Path(rel_path).stem
     for sec in sections:
         section_title = sec.section or "正文"
         page_tag = f" · p{sec.page}" if sec.page else ""
