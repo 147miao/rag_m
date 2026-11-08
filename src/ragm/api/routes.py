@@ -118,6 +118,18 @@ async def health(request: Request) -> HealthResponse:
 
 
 # ---------- status ----------
+@router.get("/readyz", summary="就绪检查（依赖可用才 200）")
+async def readyz(request: Request) -> dict:
+    svc = getattr(request.app.state, "search", None)
+    if svc is None:
+        raise HTTPException(status_code=503, detail={"ready": False, "reason": "search service unavailable"})
+    try:
+        rows = svc.store.count()
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=503, detail={"ready": False, "reason": f"milvus: {exc}"[:200]}) from exc
+    return {"ready": True, "collection": svc.store.collection, "rows": rows}
+
+
 @router.get("/status", summary="实验/任务进度")
 async def status() -> dict:
     """读取训练/评测/数据进度（来自 scripts/status.py 同一采集器）。"""

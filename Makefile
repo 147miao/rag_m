@@ -86,3 +86,15 @@ lint:
 
 clean:
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +
+
+ci: ## 本地等价 CI（lint + 单测 + 前端构建）
+	scripts/ci.sh
+
+gate: ## 确定性检索门禁（固定 fixture，不依赖 GPU/LLM）
+	.venv/bin/python scripts/eval_all.py --suite retrieval --fixture-only
+
+eval: ## 评测（检索 + 生成，需要 API/LLM）
+	.venv/bin/python scripts/eval_all.py --suite all
+
+web-build:
+	cd web && pnpm build

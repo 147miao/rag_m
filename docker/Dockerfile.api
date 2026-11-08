@@ -1,0 +1,29 @@
+# RAG-M API 镜像（含 torch，GPU 直通；模型/数据通过 volume 挂载）
+FROM python:3.13-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    UV_LINK_MODE=copy
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libgomp1 curl ca-certificates build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip install --no-cache-dir uv
+
+COPY pyproject.toml uv.lock README.md ./
+# torch 使用 CPU 轮子可显著减小镜像；GPU 推理请改为 cu124 index
+ARG TORCH_INDEX_URL=https://download.pytorch.org/whl/cpu
+RUN uv pip install --system --no-dev -e . --extra-index-url ${TORCH_INDEX_URL}
+
+COPY src ./src
+COPY scripts ./scripts
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=40s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:8000/api/readyz || exit 1
+
+CMD ["uvicorn", "ragm.api.main:app", "--host", "0.0.0.0", "--port", "8000"]

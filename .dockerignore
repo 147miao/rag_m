@@ -1,0 +1,18 @@
+# 构建上下文排除
+.git
+.venv
+.venv-*
+**/__pycache__
+.pytest_cache
+.ruff_cache
+web/node_modules
+web/dist
+.volumes
+.env
+.env.*
+data
+models
+logs
+reports
+docs/screenshots
+*.pdf
