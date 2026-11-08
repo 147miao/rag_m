@@ -125,7 +125,7 @@ async def readyz(request: Request) -> dict:
         raise HTTPException(status_code=503, detail={"ready": False, "reason": "search service unavailable"})
     try:
         rows = svc.store.count()
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise HTTPException(status_code=503, detail={"ready": False, "reason": f"milvus: {exc}"[:200]}) from exc
     return {"ready": True, "collection": svc.store.collection, "rows": rows}
 
