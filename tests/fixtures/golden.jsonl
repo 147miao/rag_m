@@ -1,0 +1,35 @@
+{"id": "hp-0", "question": "When did the author of the 91st episode of Bob's burgers make his first international debut?", "gold": ["The Hauntening", "Steven Davis"], "gold_answers": ["2005"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-1", "question": "Ehsan Pahlevan, احسان پهلوان‎ ‎is his name in Persian, he's an Iranian footballer who currently plays for Zob Ahan in Iran Pro League, which language, also known by its endonym Farsi, is one of the Western Iranian languages within the Indo-Iranian branch of the Indo-European language family?", "gold": ["Ehsan Pahlavan", "Persian language"], "gold_answers": ["Persian"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-2", "question": "Which US documentary was made first: Scared Straight! or Soldier Girls?", "gold": ["Soldier Girls", "Scared Straight!"], "gold_answers": ["Scared Straight!"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-3", "question": "Which documentary, Point of Order! or In the Basement is about the Senate Army–McCarthy hearings of 1954?", "gold": ["In the Basement (film)", "Point of Order (film)"], "gold_answers": ["Point of Order!"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-4", "question": "In which genre of music are Ely Buendia and Randy Owen both lead singers, or vocalists?", "gold": ["Ely Buendia", "Randy Owen"], "gold_answers": ["rock"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-5", "question": "The 9th AVN awards ceremony took place in a hotel formly known as?", "gold": ["9th AVN Awards", "Bally's Las Vegas"], "gold_answers": ["MGM Grand Hotel and Casino"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-6", "question": "Welcome to Happiness starred this actor who was born in June, 1970?", "gold": ["Welcome to Happiness", "Nick Offerman"], "gold_answers": ["Nick Offerman"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-7", "question": "The Armée d'Orient fought on the front that was created as an aid to what country?", "gold": ["Armée d'Orient (1915–19)", "Macedonian Front"], "gold_answers": ["Serbia"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-8", "question": "Which college was founded first, Berea College or Tufts University?", "gold": ["Berea College", "Tufts University"], "gold_answers": ["Tufts University"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-9", "question": "What league do The 2013 Texas Tech Red Raiders play in?", "gold": ["2013 Texas Tech Red Raiders football team", "Jones AT&amp;T Stadium"], "gold_answers": ["the Big 12 Conference."], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-10", "question": "What is the name of an American popular science magazine that included a discussion by Solomon W. Golomb and Martin Gardner on mutilated chessboard problem?", "gold": ["Mutilated chessboard problem", "Scientific American"], "gold_answers": ["Scientific American"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-11", "question": "The medieval fortification Castle Hill was builty by this noble man who was also known as King of which country (after the 1250s)?", "gold": ["Castle Hill, Mere", "Richard, 1st Earl of Cornwall"], "gold_answers": ["Germany"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-12", "question": "What town is located in a county with a population of approximately 407,761 in 2016?", "gold": ["Deering, New Hampshire", "Hillsborough County, New Hampshire"], "gold_answers": ["Deering"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-13", "question": "Which American War film included an Australian actress that played in the film \"Careful What You Wish For\"?", "gold": ["Red Dawn (2012 film)", "Isabel Lucas"], "gold_answers": ["Red Dawn"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-14", "question": "What ocean is Piton State College close to?", "gold": ["Piton State College", "Mauritius"], "gold_answers": ["Indian Ocean"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-15", "question": "Which brand was created first, Crusha or Mello Yello?", "gold": ["Crusha", "Mello Yello"], "gold_answers": ["Crusha"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-16", "question": "Who was the father of the emporer who established the Meissen Cathedral?", "gold": ["Meissen Cathedral", "Otto I, Holy Roman Emperor"], "gold_answers": ["Henry I the Fowler"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-17", "question": "The Garand carbine was created by a man with what nationality?", "gold": ["Garand carbine", "John Garand"], "gold_answers": ["Canadian-American"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-18", "question": "In what year was the band that was started by the third recording bass guitarist of Metallica formed?", "gold": ["Echobrain", "Jason Newsted"], "gold_answers": ["2000"], "suite": "hotpotqa", "lang": "en"}
+{"id": "hp-19", "question": "What is the common name for the hostplant of Phyllocnistis Iiriodendronella that is a tree of the family Magnoliaceae?", "gold": ["Phyllocnistis liriodendronella", "Magnolia grandiflora"], "gold_answers": ["southern magnolia or bull bay"], "suite": "hotpotqa", "lang": "en"}
+{"id": "nr-0", "question": "漩涡鸣人的父亲是谁？", "gold": ["波风水门"], "gold_answers": ["波风水门"], "suite": "naruto", "lang": "zh"}
+{"id": "nr-1", "question": "九尾是什么？", "gold": ["九尾", "尾兽"], "gold_answers": ["尾兽"], "suite": "naruto", "lang": "zh"}
+{"id": "nr-2", "question": "宇智波鼬为什么灭族？", "gold": ["宇智波鼬"], "gold_answers": ["保护村子"], "suite": "naruto", "lang": "zh"}
+{"id": "nr-3", "question": "晓组织的目的是什么？", "gold": ["晓", "晓(火影忍者)"], "gold_answers": ["收集尾兽"], "suite": "naruto", "lang": "zh"}
+{"id": "nr-4", "question": "旗木卡卡西的写轮眼是从谁那里得到的？", "gold": ["旗木卡卡西", "宇智波带土"], "gold_answers": ["带土"], "suite": "naruto", "lang": "zh"}
+{"id": "nr-5", "question": "千手柱间和宇智波斑是什么关系？", "gold": ["千手柱间", "宇智波斑"], "gold_answers": ["共同建立木叶"], "suite": "naruto", "lang": "zh"}
+{"id": "nr-6", "question": "尾兽一共有几只？", "gold": ["尾兽"], "gold_answers": ["九只"], "suite": "naruto", "lang": "zh"}
+{"id": "nr-7", "question": "自来也有哪些弟子？", "gold": ["自来也(火影忍者)"], "gold_answers": ["水门、长门"], "suite": "naruto", "lang": "zh"}
+{"id": "nr-8", "question": "第四次忍界大战的起因是什么？", "gold": ["第四次忍界大战"], "gold_answers": ["月之眼"], "suite": "naruto", "lang": "zh"}
+{"id": "nr-9", "question": "大筒木辉夜是什么人？", "gold": ["大筒木辉夜"], "gold_answers": ["查克拉之祖"], "suite": "naruto", "lang": "zh"}
+{"id": "ax-0", "question": "What metrics does RAGAS use?", "gold": ["2309.15217"], "gold_answers": ["faithfulness"], "suite": "arxiv", "lang": "en"}
+{"id": "ax-1", "question": "What problem does RAG address for language models?", "gold": ["2005.11401"], "gold_answers": ["hallucination"], "suite": "arxiv", "lang": "en"}
+{"id": "ax-2", "question": "How does Self-RAG decide when to retrieve?", "gold": ["2310.11511"], "gold_answers": ["reflection"], "suite": "arxiv", "lang": "en"}
+{"id": "ax-3", "question": "What is the GraphRAG approach?", "gold": ["2404.16130"], "gold_answers": ["entity graph"], "suite": "arxiv", "lang": "en"}
+{"id": "ax-4", "question": "What is the main advantage of GraphRAG over baseline RAG?", "gold": ["2404.16130"], "gold_answers": ["global"], "suite": "arxiv", "lang": "en"}

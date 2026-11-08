@@ -100,6 +100,41 @@ make health     # 检查 Milvus 健康
 curl -s http://127.0.0.1:8000/api/health   # 应用健康检查
 ```
 
+
+## 三·五、真实文档摄取（v1.0 新增）
+
+支持 PDF / DOCX / EPUB / Markdown / TXT / HTML，章节感知切块（parent ≤1600 字 / child 200 字 / flat 800 字），
+按 file_hash 增量构建（改文件只重解析该文件，删文件自动清理，重复执行幂等）：
+
+```bash
+python scripts/ingest_docs.py --src ~/my_docs --out data/docs
+python scripts/ingest_docs.py --src ~/my_docs --out data/docs --recreate   # 全量重建
+```
+
+产物：`data/docs/{parents,children,chunks}.jsonl` + `manifest.json` + `reports/ingest_report.md`。
+入库/查询接入尚未在本轮完成（下一步：`--embed --collection rag_docs` + `make use-docs`）。
+
+## 三·六、评测与门禁
+
+```bash
+make gate    # 确定性检索门禁：冻结快照，35 题，对比基线，下降 >0.02 失败（CI 用）
+make eval    # 检索 + 生成评测（需要 API/LLM）
+```
+
+- 基线：`tests/fixtures/eval_baseline.json`；检索快照：`tests/fixtures/hits.jsonl`；
+- 指标：Recall@10 / nDCG@10 / MRR / 答案命中 / 引用通过率 / 拒答率 / p50 延迟；
+- 当前基线：nDCG@10 **0.5738**、Recall@10 **0.6714**（35 题：HotpotQA 20 + 火影 10 + arXiv 5）。
+
+## 三·七、CI 与容器
+
+- `make ci`：ruff（src/tests）+ pytest（23 条）+ 前端 build，本地等价 CI；
+- GitHub Actions：`.github/workflows/ci.yml`（lint + tests + 检索门禁 + web build）；
+- 容器：`docker/Dockerfile.api` + compose `app` profile（含 GPU 直通、`/api/readyz` 健康检查）。
+  数据/模型需放 `$HOME/ragm_data` 并挂载到容器 `/data`；镜像未在本机实际构建（torch 体积大）。
+
+> 已知问题：本机 `companion-neo4j` 占用 7474/7687，导致 `ragm-neo4j` 无法启动；
+> 需要图谱功能时先停掉占用容器，或改端口后在 `.env` 同步 `NEO4J_URI`。
+
 ## 四、配置说明（.env）
 
 | 配置项 | 默认值 | 说明 |

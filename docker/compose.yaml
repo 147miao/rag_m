@@ -121,3 +121,38 @@ services:
     volumes:
       - ${DOCKER_VOLUME_DIRECTORY}/searxng:/etc/searxng
     restart: unless-stopped
+
+  # ---------- 应用（可选：容器化 API） ----------
+  api:
+    container_name: ragm-api
+    profiles: ["app"]
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.api
+    env_file:
+      - ../.env
+    environment:
+      MILVUS_URI: http://standalone:19530
+      NEO4J_URI: bolt://neo4j:7687
+      LLM_BASE_URL: http://host.docker.internal:11434/v1
+      RAGM_DATA_ROOT: /data
+      EMBED_MODEL_PATH: /data/models/embeddings/embeddinggemma-300m
+      RERANK_MODEL_PATH: /data/models/rerankers/bge-reranker-base
+      PARENTS_PATH: /data/data/all/parents.jsonl
+      MILVUS_COLLECTION: rag_all_chunks
+    volumes:
+      - ${RAGM_DOCKER_DATA:-${HOME}/ragm_data}:/data
+      - ../web/dist:/app/web/dist:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "8000:8000"
+    depends_on:
+      - standalone
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
