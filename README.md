@@ -132,8 +132,9 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 - 容器：`docker/Dockerfile.api` + compose `app` profile（含 GPU 直通、`/api/readyz` 健康检查）。
   数据/模型需放 `$HOME/ragm_data` 并挂载到容器 `/data`；镜像未在本机实际构建（torch 体积大）。
 
-> 已知问题：本机 `companion-neo4j` 占用 7474/7687，导致 `ragm-neo4j` 无法启动；
-> 需要图谱功能时先停掉占用容器，或改端口后在 `.env` 同步 `NEO4J_URI`。
+> 端口占用处理：本机 `companion-neo4j` 占用 7474/7687，ragm 通过 `.env` 的
+> `NEO4J_HTTP_PORT=7475` / `NEO4J_BOLT_PORT=7688` 映射到 7475/7688，并设
+> `NEO4J_URI=bolt://127.0.0.1:7688`，两个项目可同时运行（实测 health 全绿、图谱 105,788 实体）。
 
 ## 四、配置说明（.env）
 
