@@ -50,6 +50,10 @@ agentic 路由则走 `plan → tools → plan … → synthesize → verify` 的
 | 流式输出 | SSE：`stage`（路由/检索/重排/生成）→ `token`（逐字）→ `done`（完整响应） |
 | 可观测性 | LangSmith 可选接入（LLM/检索/工具/Graph 节点 span），未配置时自动关闭 |
 | 实验工具 | 分类器训练/评测、embedding/reranker/chunk 横向评测、并行基准编排 |
+| 多轮会话 | SQLite 会话历史 + 指代消解 + 子问题拆解 + 多查询检索（/api/sessions） |
+| MCP 工具 | 自写 MCP Server（list_dir/read_file/write_note），敏感工具 requires_confirmation + token |
+| LLM 降级 | opencode-go deepseek-v4-flash 主 → Ollama gemma4:31b-cloud 备；首 token 超时 + 熔断 |
+| 异步入库 | SQLite 任务表 + 单 worker + 重试/恢复（/api/ingest、/api/jobs） |
 
 ## 三、快速开始
 
@@ -167,6 +171,11 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 | `AGENT_MAX_ITERATIONS` | 2 | agentic 工具循环最大轮数 |
 | `WEB_SEARCH_URL` | `http://127.0.0.1:8080/search` | SearXNG 地址（web_search 兜底） |
 | `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` | 关闭 | 填入 key 后自动上报 LangSmith |
+| `SESSION_DB_PATH` / `SESSION_MAX_TURNS` / `SESSION_MAX_CHARS` | 空 / 6 / 4000 | 会话 SQLite 路径、历史轮数、字符预算 |
+| `MCP_ENABLED` / `MCP_SANDBOX_ROOT` / `MCP_CONFIRM_TTL_S` | false / 空 / 60 | MCP 开关、沙箱根、确认 token TTL |
+| `LLM_PROVIDERS` / `LLM_CHAT_TIMEOUT` / `LLM_FIRST_TOKEN_TIMEOUT` | 空（内置链）/ 60 / 15 | provider 链 JSON；整请求/首 token 超时 |
+| `OPENCODE_GO_API_KEY` | 空 | opencode-go 主 provider 的 key（只从环境变量读） |
+| `JOBS_DB_PATH` / `JOBS_WORKER` / `JOBS_MAX_ATTEMPTS` | 空 / true / 3 | 任务表路径、worker 开关、最大重试次数 |
 
 ## 五、API
 
@@ -181,7 +190,14 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 | POST | `/api/query` | 完整 RAG 查询（分类 → 检索 → 生成 → 引用校验） |
 | POST | `/api/query/stream` | SSE 流式：`stage` → `token` → `done` |
 | GET | `/api/scenarios` | 演示案例列表 |
-| POST | `/api/feedback` | 答案反馈（落盘 `logs/feedback.jsonl`） |
+| POST | `/api/feedback` | 答案反馈（落盘 logs/feedback.jsonl） |
+| POST/GET/DELETE | `/api/sessions` | 多轮会话：创建 / 读取历史 / 删除 |
+| GET | `/api/mcp/tools` | MCP 工具清单（含 requires_confirmation） |
+| POST | `/api/mcp/call` | 调用 MCP 工具；敏感工具返回 202 + confirm token |
+| POST | `/api/mcp/confirm` | 确认并执行敏感工具（token 单次有效） |
+| POST | `/api/ingest` | 异步入库任务（202 + job_id） |
+| GET | `/api/jobs/{id}` / `/api/jobs` | 任务状态 / 列表 |
+| POST | `/api/jobs/{id}/retry` | 重试 failed 任务 |
 
 示例：
 
@@ -360,6 +376,7 @@ rag_m/
 | [docs/16-naruto-real-docs.md](docs/16-naruto-real-docs.md) / [17](docs/17-naruto-matrix.md) | 真实文档测试与横向矩阵 |
 | [docs/18-bench-speed-and-papers.md](docs/18-bench-speed-and-papers.md) | 测试加速与 arXiv 长文档 |
 | [docs/20-frontend-live.md](docs/20-frontend-live.md) | 前端去演示化与移动端修复 |
+| [docs/22-v1.1-features.md](docs/22-v1.1-features.md) | v1.1：多轮会话 / MCP / LLM 降级 / 异步入库 |
 | [docs/21-project-explained.md](docs/21-project-explained.md) | **项目详解：语言基础 + 外部库基础 + 理论基础（长文）** |
 
 ## 十五、致谢
