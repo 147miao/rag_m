@@ -42,21 +42,7 @@ async def client(monkeypatch):
 
 
 # 会话接口已由 feat/session 实现（见 tests/test_conversation.py），此处只保留其余骨架路由。
-ROUTE_CASES = [
-    ("POST", "/api/ingest", {"src": "docs/a.md"}),
-    ("GET", "/api/jobs/j-test", None),
-    ("GET", "/api/jobs", None),
-    ("POST", "/api/jobs/j-test/retry", None),
-]
-
-
-@pytest.mark.parametrize(("method", "path", "json_body"), ROUTE_CASES)
-async def test_prep_routes_return_501(client: AsyncClient, method: str, path: str, json_body) -> None:
-    response = await client.request(method, path, json=json_body)
-    assert response.status_code == 501
-    body = response.json()
-    assert body["error"]["code"] == "http_501"
-    assert "not implemented" in body["error"]["message"]
+ROUTE_CASES: list[tuple[str, str, dict | None]] = []
 
 
 # MCP 路由已由 feat/mcp 实现：默认 MCP_ENABLED=false 时返回 503，不再是 501 骨架；
