@@ -37,6 +37,9 @@ DATASET_NAMES = {"hotpotqa": "HotpotQA", "cmrc": "CMRC2018", "pubmedqa": "PubMed
 
 
 class LangGraphRagService:
+    # API 层据此决定是否传入 SessionContext（demo 后端不支持）。
+    supports_session = True
+
     def __init__(
         self,
         classifier: Any,
@@ -193,35 +196,68 @@ class LangGraphRagService:
             "refusal": astate.get("refusal"),
         }
 
-    async def _decision_for(self, req: QueryRequest, decision: RouteDecision | None) -> RouteDecision:
+    async def _decision_for(
+        self,
+        req: QueryRequest,
+        decision: RouteDecision | None,
+        question: str | None = None,
+    ) -> RouteDecision:
         """复用 API 层已完成的分类；只有缺少决策且路由为 auto 时才调用分类器。"""
         if decision is not None:
             return decision
         if req.route_override == "auto":
-            return await asyncio.to_thread(self.rag.classifier.classify, req.question)
+            return await asyncio.to_thread(self.rag.classifier.classify, question or req.question)
         return override_decision(req.route_override)
 
-    async def query(self, req: QueryRequest, decision: RouteDecision | None = None) -> QueryResponse:
+    @staticmethod
+    def _session_question(req: QueryRequest, session: Any | None) -> str:
+        """有会话上下文时用改写后的问题检索/生成；响应里的 question 仍是用户原话。"""
+        rewritten = getattr(session, "rewritten_question", None) if session is not None else None
+        return str(rewritten).strip() if rewritten else req.question
+
+    @staticmethod
+    def _session_subquestions(session: Any | None) -> list[str]:
+        if session is None:
+            return []
+        return [str(s) for s in (getattr(session, "subquestions", None) or []) if str(s).strip()]
+
+    async def query(
+        self,
+        req: QueryRequest,
+        decision: RouteDecision | None = None,
+        *,
+        session: Any | None = None,
+    ) -> QueryResponse:
         t0 = time.perf_counter()
-        decision = await self._decision_for(req, decision)
+        question = self._session_question(req, session)
+        subquestions = self._session_subquestions(session)
+        decision = await self._decision_for(req, decision, question)
         if self.agent is not None:
             route = decision.route if req.route_override == "auto" else req.route_override
             if route == "agentic":
-                astate = await asyncio.to_thread(self.agent.invoke, req.question)
+                astate = await asyncio.to_thread(self.agent.invoke, question)
                 state = self._agent_state(decision, route, astate)
                 return self._build(req, state, int((time.perf_counter() - t0) * 1000))
-        state = await asyncio.to_thread(self.rag.invoke, req.question, req.route_override, decision)
+        state = await asyncio.to_thread(
+            self.rag.invoke, question, req.route_override, decision, subquestions=subquestions
+        )
         return self._build(req, state, int((time.perf_counter() - t0) * 1000))
 
     async def stream(
-        self, req: QueryRequest, decision: RouteDecision | None = None
+        self,
+        req: QueryRequest,
+        decision: RouteDecision | None = None,
+        *,
+        session: Any | None = None,
     ) -> AsyncIterator[StageEvent | TokenEvent | DoneEvent]:
         t0 = time.perf_counter()
-        decision = await self._decision_for(req, decision)
+        question = self._session_question(req, session)
+        subquestions = self._session_subquestions(session)
+        decision = await self._decision_for(req, decision, question)
         if self.agent is not None:
             route = decision.route if req.route_override == "auto" else req.route_override
             if route == "agentic":
-                astate = await asyncio.to_thread(self.agent.invoke, req.question)
+                astate = await asyncio.to_thread(self.agent.invoke, question)
                 state = self._agent_state(decision, route, astate)
                 for index, step in enumerate(self._trace(state)):
                     yield StageEvent(index=index, step=step)
@@ -231,7 +267,9 @@ class LangGraphRagService:
                     await asyncio.sleep(0.01)
                 yield DoneEvent(response=self._build(req, state, int((time.perf_counter() - t0) * 1000)))
                 return
-        state = await asyncio.to_thread(self.rag.prepare, req.question, req.route_override, decision)
+        state = await asyncio.to_thread(
+            self.rag.prepare, question, req.route_override, decision, subquestions=subquestions
+        )
         steps = [
             ("route", "路由分类", state.get("classify_ms", 0), f"{state.get('classifier_backend', '')} · {state.get('route')} {state.get('confidence', 0):.2f}"),
             ("retrieve", "混合检索", state.get("retrieve_ms", 0), state.get("retrieve_detail") or f"dense + BM25 · RRF · top {len(state.get('hits') or [])}"),

@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import logging
 import re
 import time
 from typing import Any, TypedDict
@@ -18,12 +19,16 @@ from .citations import verify_citations
 from .llm import LLMClient
 from .prompts import build_messages, build_messages_plain
 
+logger = logging.getLogger(__name__)
+
 ROUTE_TOP_K = {"simple": 8, "multihop": 12, "agentic": 12}
+MIN_MULTI_QUERY_SUBQUESTIONS = 2
 
 
 class RagState(TypedDict, total=False):
     question: str
     route_override: str
+    subquestions: list[str]
     classifier_decision: Any
     route: str
     label: str
@@ -84,6 +89,35 @@ def split_plain_answer(text: str) -> tuple[str, str]:
     return "", raw
 
 
+def merge_subquery_hits(results: list[list[dict]], k: int) -> list[dict]:
+    """按 chunk_id 合并多个子问题的检索结果：分数取最大、命中子问题数多的优先。"""
+    merged: dict[str, dict] = {}
+    for hits in results:
+        for hit in hits:
+            chunk_id = str(hit.get("chunk_id") or "")
+            if not chunk_id:
+                continue
+            item = merged.get(chunk_id)
+            if item is None:
+                merged[chunk_id] = {
+                    **hit,
+                    "score": float(hit.get("score") or 0.0),
+                    "dense": float(hit.get("dense") or 0.0),
+                    "sparse": float(hit.get("sparse") or 0.0),
+                    "multi_query": 1,
+                }
+                continue
+            item["score"] = max(item["score"], float(hit.get("score") or 0.0))
+            item["dense"] = max(item["dense"], float(hit.get("dense") or 0.0))
+            item["sparse"] = max(item["sparse"], float(hit.get("sparse") or 0.0))
+            item["multi_query"] += 1
+    ranked = sorted(
+        merged.values(),
+        key=lambda item: (-int(item.get("multi_query", 1)), -float(item.get("score", 0.0)), str(item.get("chunk_id"))),
+    )
+    return ranked[:k]
+
+
 class RagGraph:
     def __init__(
         self,
@@ -142,12 +176,27 @@ class RagGraph:
             "classify_ms": classify_ms,
         }
 
+    def _retrieve_hits(self, state: RagState, k: int) -> tuple[list[dict], int]:
+        """单问题走原逻辑；>=2 个子问题时逐个子问题检索并按 chunk_id 去重合并。"""
+        subquestions = [q.strip() for q in (state.get("subquestions") or []) if q and q.strip()]
+        if len(subquestions) < MIN_MULTI_QUERY_SUBQUESTIONS:
+            return self.search.search_with_scores(state["question"], k=k)["hits"], 0
+        results: list[list[dict]] = []
+        for subquestion in subquestions:
+            try:
+                results.append(self.search.search_with_scores(subquestion, k=k).get("hits") or [])
+            except Exception:  # 单个子问题失败不应中断整体检索
+                logger.warning("subquestion retrieval failed: %s", subquestion[:80], exc_info=True)
+        merged = merge_subquery_hits(results, k)
+        if merged:
+            return merged, len(results)
+        return self.search.search_with_scores(state["question"], k=k)["hits"], 0
+
     def _retrieve_node(self, state: RagState) -> dict:
         t0 = time.perf_counter()
         route = state.get("route", "simple")
         k = {"simple": self.top_k, "multihop": self.multihop_k, "agentic": self.agentic_k}.get(route, self.top_k)
-        res = self.search.search_with_scores(state["question"], k=k)
-        hits = res["hits"]
+        hits, multi_query_count = self._retrieve_hits(state, k)
         kg_paths: list[dict] = []
         kg_payload = None
         kg_seeds: list[str] = []
@@ -183,6 +232,8 @@ class RagGraph:
             hits = self.reranker.rerank(state["question"], hits[: self.rerank_candidates], top_n=max(k, 8))
             rerank_ms = round((time.perf_counter() - t_r) * 1000, 1)
         detail = f"dense + BM25 · RRF · top {len(hits)}"
+        if multi_query_count:
+            detail = f"多查询 {multi_query_count} · " + detail
         if graph_added:
             detail += f" · 图谱 +{graph_added}"
         if iter_added:
@@ -257,14 +308,32 @@ class RagGraph:
         return g.compile()
 
     # ---------- public ----------
-    def invoke(self, question: str, route_override: str = "auto", decision: Any | None = None) -> RagState:
+    def invoke(
+        self,
+        question: str,
+        route_override: str = "auto",
+        decision: Any | None = None,
+        *,
+        subquestions: list[str] | None = None,
+    ) -> RagState:
         state: RagState = {"question": question, "route_override": route_override}
+        if subquestions:
+            state["subquestions"] = [s for s in subquestions if s.strip()]
         if decision is not None:
             state["classifier_decision"] = decision
         return self._graph.invoke(state)
 
-    def prepare(self, question: str, route_override: str = "auto", decision: Any | None = None) -> RagState:
+    def prepare(
+        self,
+        question: str,
+        route_override: str = "auto",
+        decision: Any | None = None,
+        *,
+        subquestions: list[str] | None = None,
+    ) -> RagState:
         state: RagState = {"question": question, "route_override": route_override}
+        if subquestions:
+            state["subquestions"] = [s for s in subquestions if s.strip()]
         if decision is not None:
             state["classifier_decision"] = decision
         state.update(self._classify_node(state))

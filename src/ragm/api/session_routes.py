@@ -1,32 +1,57 @@
-"""会话 API 契约骨架（v1.1 W1，owner: feat/session）。
-
-prep 阶段只落路径/请求响应模型，全部返回 501；业务实现由 feature 分支替换。
-"""
+"""会话 API（v1.1 W1）：创建 / 详情 / 删除，存储走 SessionStore。"""
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 
-from .schemas import SessionCreateRequest, SessionDetail, SessionInfo
+from ..config import get_settings
+from ..conversation.store import SessionStore
+from .schemas import SessionCreateRequest, SessionDetail, SessionInfo, SessionMessage
 
 router = APIRouter(prefix="/api", tags=["sessions"])
 
-_NOT_IMPLEMENTED = "session API not implemented yet (prep/v1.1 skeleton, owner: feat/session)"
+
+def session_store(request: Request) -> SessionStore:
+    """按应用实例懒加载会话存储；测试可通过 SESSION_DB_PATH 指向 tmp_path。"""
+    store = getattr(request.app.state, "session_store", None)
+    if store is None:
+        store = SessionStore(get_settings().session_store_path)
+        request.app.state.session_store = store
+    return store
 
 
-def _todo() -> HTTPException:
-    return HTTPException(status_code=501, detail=_NOT_IMPLEMENTED)
+def _not_found(session_id: str) -> HTTPException:
+    return HTTPException(status_code=404, detail=f"session not found: {session_id}")
+
+
+def _detail_payload(record: dict) -> SessionDetail:
+    return SessionDetail(
+        id=record["id"],
+        title=record["title"],
+        created_at=record["created_at"],
+        updated_at=record["updated_at"],
+        message_count=record["message_count"],
+        messages=[
+            SessionMessage(role=message["role"], content=message["content"], created_at=message["created_at"])
+            for message in record["messages"]
+        ],
+    )
 
 
 @router.post("/sessions", response_model=SessionInfo, status_code=201, summary="创建会话")
-async def create_session(req: SessionCreateRequest) -> SessionInfo:
-    raise _todo()
+def create_session(req: SessionCreateRequest, request: Request) -> SessionInfo:
+    record = session_store(request).create_session(req.title)
+    return SessionInfo(**record)
 
 
 @router.get("/sessions/{session_id}", response_model=SessionDetail, summary="会话详情（含消息）")
-async def get_session(session_id: str) -> SessionDetail:
-    raise _todo()
+def get_session(session_id: str, request: Request) -> SessionDetail:
+    record = session_store(request).get_session(session_id)
+    if record is None:
+        raise _not_found(session_id)
+    return _detail_payload(record)
 
 
 @router.delete("/sessions/{session_id}", status_code=204, summary="删除会话")
-async def delete_session(session_id: str) -> None:
-    raise _todo()
+def delete_session(session_id: str, request: Request) -> None:
+    if not session_store(request).delete_session(session_id):
+        raise _not_found(session_id)
