@@ -360,6 +360,21 @@ async def test_health_backup_circuit_open_does_not_degrade(health_app) -> None:
     assert detail[1]["state"] == "open"
 
 
+async def test_health_providers_ok_ignores_legacy_ollama_failure(health_app, monkeypatch) -> None:
+    client, _ = health_app
+
+    async def _fail(*args, **kwargs) -> HealthCheck:
+        return HealthCheck(ok=False, detail="legacy ollama url unreachable")
+
+    monkeypatch.setattr(routes, "_check_ollama", _fail)
+
+    body = (await client.get("/api/health")).json()
+
+    assert body["checks"]["providers"]["ok"] is True
+    assert body["checks"]["ollama"]["ok"] is False
+    assert body["status"] == "ok"
+
+
 async def test_health_primary_circuit_open_degrades(health_app) -> None:
     client, llm = health_app
     for _ in range(3):

@@ -16,7 +16,6 @@ from .. import __version__
 from ..classifier.base import RouteDecision
 from ..config import get_settings
 from ..conversation.rewrite import Rewriter, SessionContext
-from ..conversation.store import SessionStore
 from ..ops.status import collect_status
 from ..rag.llm import LLMClient
 from ..rag.llm_router import build_llm
@@ -40,6 +39,7 @@ from .schemas import (
     StageEvent,
     TokenEvent,
 )
+from .session_routes import session_store
 
 router = APIRouter(prefix="/api", tags=["rag"])
 LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
@@ -80,20 +80,20 @@ def _classify(request: Request, question: str) -> ClassifierInfo:
 
 
 # ---------- multi-turn session helpers ----------
-def _session_store(request: Request) -> SessionStore:
-    store = getattr(request.app.state, "session_store", None)
-    if store is None:
-        store = SessionStore(get_settings().session_store_path)
-        request.app.state.session_store = store
-    return store
-
-
 def _rewriter(request: Request) -> Rewriter:
-    """测试可注入 app.state.rewriter；默认用主 LLM 配置。"""
+    """测试可注入 app.state.rewriter；否则优先复用 lifespan 构建的 FallbackLLM。"""
     rewriter = getattr(request.app.state, "rewriter", None)
     if rewriter is None:
-        settings = get_settings()
-        llm = LLMClient(settings.llm_base_url, settings.llm_model, settings.llm_api_key, settings.llm_temperature)
+        llm = getattr(request.app.state, "llm", None)
+        if llm is None:
+            # 无 lifespan 的早期请求：回退到旧的单 provider 客户端。
+            settings = get_settings()
+            llm = LLMClient(
+                settings.llm_base_url,
+                settings.llm_model,
+                settings.llm_api_key,
+                settings.llm_temperature,
+            )
         rewriter = Rewriter(llm)
         request.app.state.rewriter = rewriter
     return rewriter
@@ -113,7 +113,7 @@ async def _session_context(req: QueryRequest, request: Request) -> SessionContex
     if not req.session_id:
         return None
     settings = get_settings()
-    store = _session_store(request)
+    store = session_store(request)
     record = await asyncio.to_thread(store.get_session, req.session_id)
     if record is None:
         raise HTTPException(status_code=404, detail=f"session not found: {req.session_id}")
@@ -135,7 +135,7 @@ async def _session_context(req: QueryRequest, request: Request) -> SessionContex
 
 async def _persist_turn(request: Request, ctx: SessionContext, resp: QueryResponse) -> None:
     """查询完成后写入用户原话与助手回答，供下一轮改写使用。"""
-    store = _session_store(request)
+    store = session_store(request)
     answer = resp.answer.lead
     if resp.answer.body:
         answer = f"{answer}\n\n{resp.answer.body}" if answer else resp.answer.body
@@ -244,7 +244,9 @@ async def health(request: Request) -> HealthResponse:
         ok=True,
         detail=f"enabled · {settings.langsmith_project}" if settings.langsmith_tracing and settings.langsmith_api_key else "disabled",
     )
-    status = "ok" if all(c.ok for c in checks.values()) else "degraded"
+    # providers 已覆盖 LLM 健康时，legacy ollama（LLM_BASE_URL）只作信息项，不参与整体状态。
+    gating = {name: check for name, check in checks.items() if not (name == "ollama" and "providers" in checks)}
+    status = "ok" if all(c.ok for c in gating.values()) else "degraded"
     return HealthResponse(
         status=status,
         version=__version__,

@@ -12,6 +12,7 @@ from __future__ import annotations
 import json
 import os
 import threading
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
@@ -19,7 +20,9 @@ from httpx import ASGITransport, AsyncClient
 from mcp import Client
 
 from ragm.api.main import create_app
-from ragm.config import get_settings
+from ragm.config import Settings, get_settings
+from ragm.mcp import confirmation as confirmation_module
+from ragm.mcp import init_mcp
 from ragm.mcp.client import MCPClientManager, extract_tool_result
 from ragm.mcp.confirmation import ConfirmationStore, Expired, Unknown, Used
 from ragm.mcp.server import create_server
@@ -148,6 +151,36 @@ async def test_missing_sandbox_root_rejected(monkeypatch) -> None:
 
 
 # ---------- confirmation: A6 ----------
+
+
+def test_settings_confirm_secret_is_wired_into_store(monkeypatch) -> None:
+    monkeypatch.setattr(confirmation_module, "time", SimpleNamespace(time=lambda: 1000.0))
+    monkeypatch.setenv("MCP_CONFIRM_SECRET", "shared-secret")
+    monkeypatch.delenv("MCP_ENABLED", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.mcp_confirm_secret == "shared-secret"
+    app = SimpleNamespace(state=SimpleNamespace())
+    init_mcp(app, settings)
+
+    token = app.state.mcp_confirmations.issue("write_note", {"path": "a.md"})
+    expected = ConfirmationStore(ttl_s=settings.mcp_confirm_ttl_s, secret=b"shared-secret")
+    assert token == expected.issue("write_note", {"path": "a.md"})
+
+
+def test_empty_confirm_secret_uses_process_random(monkeypatch) -> None:
+    monkeypatch.setattr(confirmation_module, "time", SimpleNamespace(time=lambda: 1000.0))
+    monkeypatch.delenv("MCP_CONFIRM_SECRET", raising=False)
+    monkeypatch.delenv("MCP_ENABLED", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.mcp_confirm_secret == ""
+    app = SimpleNamespace(state=SimpleNamespace())
+    init_mcp(app, settings)
+
+    token = app.state.mcp_confirmations.issue("write_note", {"path": "a.md"})
+    default_store = ConfirmationStore(ttl_s=settings.mcp_confirm_ttl_s)
+    assert token == default_store.issue("write_note", {"path": "a.md"})
+    empty_store = ConfirmationStore(ttl_s=settings.mcp_confirm_ttl_s, secret=b"")
+    assert token != empty_store.issue("write_note", {"path": "a.md"})
 
 
 def test_confirmation_issue_and_consume_returns_args() -> None:

@@ -3,6 +3,7 @@
 - tick() 领取并执行一个 queued 任务；执行函数可注入
   （测试用 fake ingest，不跑 GPU）；
 - 失败按 5s / 30s / 120s 退避写 next_run_at，attempts 保留；达到 max_attempts 落 failed；
+- max_attempts 是总尝试次数（默认 4 = 1 次初始 + 3 次重试）；
 - start()/shutdown() 管理唯一的 worker 线程，start 幂等，shutdown join。
 """
 from __future__ import annotations

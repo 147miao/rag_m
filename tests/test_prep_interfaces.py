@@ -160,6 +160,7 @@ def test_settings_v11_defaults(monkeypatch) -> None:
         "MCP_ENABLED",
         "MCP_SANDBOX_ROOT",
         "MCP_CONFIRM_TTL_S",
+        "MCP_CONFIRM_SECRET",
         "LLM_PROVIDERS",
         "LLM_CHAT_TIMEOUT",
         "LLM_FIRST_TOKEN_TIMEOUT",
@@ -178,12 +179,14 @@ def test_settings_v11_defaults(monkeypatch) -> None:
     assert settings.mcp_enabled is False
     assert settings.mcp_sandbox_root == ""
     assert settings.mcp_confirm_ttl_s == 60
+    assert settings.mcp_confirm_secret == ""
     assert settings.llm_chat_timeout == 60.0
     assert settings.llm_first_token_timeout == 15.0
     assert settings.jobs_db_path == ""
     assert settings.jobs_store_path == Path("/tmp/ragm-prep/data/jobs.sqlite")
     assert settings.jobs_worker is True
-    assert settings.jobs_max_attempts == 3
+    # max_attempts 是总尝试次数：4 = 1 次初始 + 3 次重试。
+    assert settings.jobs_max_attempts == 4
 
     providers = settings.resolved_llm_providers
     assert [item["name"] for item in providers] == ["opencode-go", "ollama"]

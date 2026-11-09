@@ -288,7 +288,7 @@ class JobInfo(APIModel):
     id: str
     status: JobStatus
     attempts: int = Field(default=0, ge=0)
-    max_attempts: int = Field(default=3, ge=1)
+    max_attempts: int = Field(default=4, ge=1)
     error: str | None = None
     created_at: datetime
     updated_at: datetime

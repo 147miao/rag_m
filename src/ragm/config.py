@@ -119,12 +119,15 @@ class Settings(BaseSettings):
     mcp_enabled: bool = False
     mcp_sandbox_root: str = ""
     mcp_confirm_ttl_s: int = 60
+    # 确认 token 的 HMAC secret；空 = 进程内随机（重启后旧 token 全部失效）。
+    mcp_confirm_secret: str = ""
 
     # ---- async ingest jobs (v1.1 W4) ----
     # 空 = data_root/data/jobs.sqlite，由 jobs_store_path 解析。
     jobs_db_path: str = ""
     jobs_worker: bool = True
-    jobs_max_attempts: int = 3
+    # 总尝试次数（1 次初始 + N 次重试）：默认 4 = 1 次初始 + 3 次重试。
+    jobs_max_attempts: int = 4
 
     @property
     def raw_dir(self) -> Path:

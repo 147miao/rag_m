@@ -198,7 +198,7 @@ def create_app() -> FastAPI:
         return response
 
     app.include_router(router)
-    # v1.1 接口：jobs 已由 feat/jobs 实现；session/mcp 骨架仍返回 501。
+    # v1.1 接口：sessions / MCP / jobs 均已实现。
     app.include_router(session_router)
     app.include_router(mcp_router)
     app.include_router(jobs_router)

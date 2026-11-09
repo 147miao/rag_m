@@ -172,10 +172,16 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 | `WEB_SEARCH_URL` | `http://127.0.0.1:8080/search` | SearXNG 地址（web_search 兜底） |
 | `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` | 关闭 | 填入 key 后自动上报 LangSmith |
 | `SESSION_DB_PATH` / `SESSION_MAX_TURNS` / `SESSION_MAX_CHARS` | 空 / 6 / 4000 | 会话 SQLite 路径、历史轮数、字符预算 |
-| `MCP_ENABLED` / `MCP_SANDBOX_ROOT` / `MCP_CONFIRM_TTL_S` | false / 空 / 60 | MCP 开关、沙箱根、确认 token TTL |
-| `LLM_PROVIDERS` / `LLM_CHAT_TIMEOUT` / `LLM_FIRST_TOKEN_TIMEOUT` | 空（内置链）/ 60 / 15 | provider 链 JSON；整请求/首 token 超时 |
+| `MCP_ENABLED` / `MCP_SANDBOX_ROOT` / `MCP_CONFIRM_TTL_S` / `MCP_CONFIRM_SECRET` | false / 空 / 60 / 空 | MCP 开关、沙箱根、确认 token TTL 与 HMAC secret（空 = 进程随机） |
+| `LLM_PROVIDERS` / `LLM_CHAT_TIMEOUT` / `LLM_FIRST_TOKEN_TIMEOUT` | 空（内置链）/ 60 / 15 | provider 链单行 JSON；整请求/首 token 超时；`/api/health` 的 `providers` 检查逐个返回各 provider 的 `state` / `failures` |
 | `OPENCODE_GO_API_KEY` | 空 | opencode-go 主 provider 的 key（只从环境变量读） |
-| `JOBS_DB_PATH` / `JOBS_WORKER` / `JOBS_MAX_ATTEMPTS` | 空 / true / 3 | 任务表路径、worker 开关、最大重试次数 |
+| `JOBS_DB_PATH` / `JOBS_WORKER` / `JOBS_MAX_ATTEMPTS` | 空 / true / 4 | 任务表路径、worker 开关、总尝试次数（4 = 1 次初始 + 3 次重试） |
+
+`LLM_PROVIDERS` 单行 JSON 示例（键：`name` / `base_url` / `model` / `api_key_env` / `api_key` / `first_token_timeout`）：
+
+```bash
+LLM_PROVIDERS='[{"name":"opencode-go","base_url":"http://127.0.0.1:8788/inference/go/v1","model":"deepseek-v4-flash","api_key_env":"OPENCODE_GO_API_KEY","first_token_timeout":15},{"name":"ollama","base_url":"http://127.0.0.1:11434/v1","model":"gemma4:31b-cloud","api_key":"ollama","first_token_timeout":20}]'
+```
 
 ## 五、API
 
@@ -183,7 +189,7 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
-| GET | `/api/health` | 健康检查：Milvus / Ollama / 分类器 / 图谱 / LangSmith |
+| GET | `/api/health` | 健康检查：Milvus / Ollama / 分类器 / 图谱 / providers（LLM 各 provider 的 state/failures）/ LangSmith |
 | GET | `/api/status` | 实验与训练进度看板（数据文件、GPU、训练日志） |
 | POST | `/api/route` | 只做路由分类：`{label, route, confidence, backend, latency_ms}` |
 | POST | `/api/search` | 混合检索：`mode=dense|sparse|hybrid|small2big` |
@@ -195,7 +201,7 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 | GET | `/api/mcp/tools` | MCP 工具清单（含 requires_confirmation） |
 | POST | `/api/mcp/call` | 调用 MCP 工具；敏感工具返回 202 + confirm token |
 | POST | `/api/mcp/confirm` | 确认并执行敏感工具（token 单次有效） |
-| POST | `/api/ingest` | 异步入库任务（202 + job_id） |
+| POST | `/api/ingest` | 异步入库任务（202 + `JobInfo.id`） |
 | GET | `/api/jobs/{id}` / `/api/jobs` | 任务状态 / 列表 |
 | POST | `/api/jobs/{id}/retry` | 重试 failed 任务 |
 

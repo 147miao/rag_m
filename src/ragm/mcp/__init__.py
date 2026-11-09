@@ -38,7 +38,9 @@ def init_mcp(app: Any, settings: Any) -> None:
     """lifespan 装配入口：初始化确认存储；启用时再创建 stdio client manager。"""
     from .confirmation import ConfirmationStore
 
-    app.state.mcp_confirmations = ConfirmationStore(ttl_s=settings.mcp_confirm_ttl_s)
+    secret = str(getattr(settings, "mcp_confirm_secret", "") or "").strip()
+    # 空 secret 传 None，让 ConfirmationStore 走进程内随机值（而不是空 key）。
+    app.state.mcp_confirmations = ConfirmationStore(ttl_s=settings.mcp_confirm_ttl_s, secret=secret or None)
     app.state.mcp = None
     if not getattr(settings, "mcp_enabled", False):
         logger.info("MCP disabled (MCP_ENABLED=false)")

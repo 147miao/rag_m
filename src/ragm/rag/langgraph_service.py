@@ -52,6 +52,7 @@ class LangGraphRagService:
         reranker: Any = None,
     ) -> None:
         self.settings = settings
+        self.llm = llm
         self.kg = kg
         self.agent = agent
         self.executor = executor
@@ -125,6 +126,11 @@ class LangGraphRagService:
         )
         return steps
 
+    def _last_provider(self) -> str | None:
+        """回填实际服务本次请求的 provider；fake llm 无该属性时返回 None。"""
+        provider = getattr(self.llm, "last_provider", None)
+        return str(provider) if provider else None
+
     def _build(self, req: QueryRequest, state: dict, latency_ms: int) -> QueryResponse:
         hits = state.get("hits") or []
         route = state.get("route", "simple")
@@ -165,6 +171,7 @@ class LangGraphRagService:
                 reason=state.get("reason", ""),
             ),
             served_by="langgraph",
+            provider=self._last_provider(),
             generated_at=datetime.now(UTC),
         )
 
