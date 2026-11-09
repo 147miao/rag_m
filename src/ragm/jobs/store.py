@@ -3,6 +3,7 @@
 设计约定：
 - 每个操作使用独立连接，WAL + busy_timeout=3000ms，适配 API 线程与 worker 线程并发；
 - 状态：queued → running → succeeded | failed；queued/running → cancelled；
+- max_attempts 是总尝试次数（1 次初始 + max_attempts-1 次重试），默认 4 = 1 + 3；
 - 自动重试由 runner 调用 schedule_retry() 写 next_run_at 实现（attempts 保留）；
 - 手动 retry() 只允许 failed → queued，并重置 attempts；
 - recover() 把上次进程遗留的 running 改回 queued（保留 attempts），可重复调用。
@@ -40,7 +41,7 @@ CREATE TABLE IF NOT EXISTS jobs (
     payload TEXT NOT NULL,
     status TEXT NOT NULL CHECK (status IN ('queued', 'running', 'succeeded', 'failed', 'cancelled')),
     attempts INTEGER NOT NULL DEFAULT 0,
-    max_attempts INTEGER NOT NULL DEFAULT 3,
+    max_attempts INTEGER NOT NULL DEFAULT 4,
     error TEXT,
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL,
@@ -114,7 +115,7 @@ class JobsStore:
         self,
         db_path: str | Path,
         *,
-        max_attempts: int = 3,
+        max_attempts: int = 4,
         busy_timeout_ms: int = BUSY_TIMEOUT_MS,
     ) -> None:
         self.db_path = Path(db_path)

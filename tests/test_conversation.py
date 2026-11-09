@@ -2,12 +2,16 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
+from collections.abc import Iterator
+from types import SimpleNamespace
 from typing import Any
 
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from ragm.api import routes
 from ragm.api.main import create_app
 from ragm.api.schemas import QueryRequest
 from ragm.classifier.base import RouteDecision
@@ -16,6 +20,7 @@ from ragm.conversation.rewrite import Rewriter, SessionContext
 from ragm.conversation.store import SessionStore
 from ragm.rag.graph import RagGraph
 from ragm.rag.langgraph_service import LangGraphRagService
+from ragm.rag.llm_router import build_llm
 from ragm.rag.service import DemoRagService
 
 HISTORY = [
@@ -43,6 +48,12 @@ class FakeLLM:
         if self.error is not None:
             raise self.error
         return {"text": self.text, "tokens_in": 12, "tokens_out": 8}
+
+    def stream_chat(self, messages: list[dict], max_tokens: int = 1024) -> Iterator[str]:
+        self.calls.append({"messages": messages, "max_tokens": max_tokens, "json_mode": False, "stream": True})
+        if self.error is not None:
+            raise self.error
+        yield self.text
 
 
 def _hit(chunk_id: str, score: float) -> dict:
@@ -156,6 +167,32 @@ def test_rewriter_resolves_references_and_splits_subquestions() -> None:
     prompt = llm.calls[0]["messages"][-1]["content"]
     assert "波风水门" in prompt
     assert "他的师父是谁？" in prompt
+    system_prompt = llm.calls[0]["messages"][0]["content"]
+    assert "上一轮**用户问题**" in system_prompt
+    assert "示例" in system_prompt
+
+
+def test_rewriter_pronoun_guard_uses_previous_user_subject() -> None:
+    wrong = json.dumps(
+        {"rewritten": "波风水门的师父是谁？", "subquestions": ["波风水门的师父是谁？"]},
+        ensure_ascii=False,
+    )
+    result = Rewriter(FakeLLM(wrong)).rewrite("他的师父是谁？", HISTORY)
+    assert result["rewritten"].startswith("鸣人")
+    assert "波风水门" in result["rewritten"]
+
+
+def test_rewriter_falls_back_to_llm_client_without_state_llm(monkeypatch) -> None:
+    class StubLLM:
+        def __init__(self, *args) -> None:
+            self.args = args
+
+    monkeypatch.setattr(routes, "LLMClient", StubLLM)
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace()))
+    rewriter = routes._rewriter(request)
+    assert isinstance(rewriter.llm, StubLLM)
+    assert len(rewriter.llm.args) == 4
+    assert routes._rewriter(request) is rewriter
 
 
 def test_rewriter_caps_and_dedupes_subquestions() -> None:
@@ -175,6 +212,20 @@ def test_rewriter_caps_and_dedupes_subquestions() -> None:
 def test_rewriter_falls_back_on_failures(llm: FakeLLM) -> None:
     result = Rewriter(llm).rewrite("他的师父是谁？", HISTORY)
     assert result == {"rewritten": "他的师父是谁？", "subquestions": []}
+
+
+@pytest.mark.skipif(os.environ.get("RAGM_LLM_E2E") != "1", reason="真实 LLM 集成测试，设 RAGM_LLM_E2E=1 开启")
+def test_rewriter_real_llm_resolves_pronoun_to_user_subject() -> None:
+    history = [
+        {"role": "user", "content": "鸣人的父亲是波风水门"},
+        {"role": "assistant", "content": "是的，鸣人的父亲是波风水门。"},
+    ]
+    llm = build_llm(Settings(_env_file=None))
+    if not llm.providers:
+        pytest.skip("no usable LLM providers (Ollama gemma4 not configured)")
+    result = Rewriter(llm).rewrite("他的师父是谁？", history)
+    assert "鸣人" in result["rewritten"]
+    assert "波风水门的师父" not in result["rewritten"]
 
 
 def test_rewriter_skips_llm_without_history() -> None:
@@ -243,6 +294,42 @@ async def test_langgraph_service_uses_rewritten_question_and_subquestions() -> N
     assert response.question == "他的师父是谁？"
 
 
+async def test_langgraph_service_backfills_provider() -> None:
+    search = FakeSearch({"q": [_hit("c1", 0.9)]})
+    llm = FakeLLM("答案 [1]")
+    service = LangGraphRagService(None, search, llm, Settings(_env_file=None))
+    request = QueryRequest(question="q", route_override="simple")
+    # fake llm 没有 last_provider 属性 → None；有则回填为字符串。
+    assert (await service.query(request)).provider is None
+    llm.last_provider = "fake-primary"
+    assert (await service.query(request)).provider == "fake-primary"
+
+
+def _langgraph_service(provider: str) -> LangGraphRagService:
+    llm = FakeLLM("答案 [1]")
+    llm.last_provider = provider
+    return LangGraphRagService(None, FakeSearch({"q": [_hit("c1", 0.9)]}), llm, Settings(_env_file=None))
+
+
+async def test_query_response_backfills_provider(session_env) -> None:
+    client, app, _, _ = session_env
+    app.state.service = _langgraph_service("fake-primary")
+    resp = await client.post("/api/query", json={"question": "q", "route_override": "simple"})
+    assert resp.status_code == 200
+    assert resp.json()["provider"] == "fake-primary"
+
+
+async def test_query_stream_done_backfills_provider(session_env) -> None:
+    client, app, _, _ = session_env
+    app.state.service = _langgraph_service("fake-primary")
+    resp = await client.post("/api/query/stream", json={"question": "q", "route_override": "simple"})
+    assert resp.status_code == 200
+    text = (await resp.aread()).decode()
+    done_block = [block for block in text.split("\n\n") if block.startswith("event: done")][-1]
+    payload = json.loads(done_block.split("data:", 1)[1].strip())
+    assert payload["response"]["provider"] == "fake-primary"
+
+
 # ---------- session API ----------
 @pytest.fixture
 async def session_env(monkeypatch, tmp_path):
@@ -309,6 +396,24 @@ async def test_query_with_session_rewrites_and_persists(session_env) -> None:
     assert detail["messages"][2]["content"] == "他的师父是谁？"
 
 
+async def test_rewriter_prefers_app_state_llm(session_env) -> None:
+    client, app, _, db_path = session_env
+    del app.state.rewriter
+    fake = FakeLLM(REWRITE_PAYLOAD)
+    app.state.llm = fake
+    session_id = (await client.post("/api/sessions", json={})).json()["id"]
+    SessionStore(db_path).append_message(session_id, "user", "鸣人的父亲是波风水门")
+
+    resp = await client.post(
+        "/api/query",
+        json={"question": "他的师父是谁？", "session_id": session_id, "route_override": "simple"},
+    )
+    assert resp.status_code == 200
+    assert len(fake.calls) == 1
+    assert fake.calls[0]["json_mode"] is True
+    assert "鸣人" in resp.json()["rewritten_question"]
+
+
 async def test_query_without_history_skips_rewriter(session_env) -> None:
     client, _, llm, _ = session_env
     session_id = (await client.post("/api/sessions", json={})).json()["id"]
@@ -358,6 +463,7 @@ async def test_query_without_session_keeps_legacy_response(session_env) -> None:
     body = resp.json()
     assert body["session_id"] is None
     assert body["subquestions"] == []
+    assert body["provider"] is None
     assert llm.calls == []
 
 

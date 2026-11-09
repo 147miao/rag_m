@@ -101,6 +101,27 @@ def test_failure_retries_until_max_attempts_then_failed(store: JobsStore) -> Non
     assert saved is not None and saved.status == FAILED
 
 
+def test_default_max_attempts_means_three_retries(tmp_path: Path) -> None:
+    store = JobsStore(tmp_path / "default-jobs.sqlite")
+    assert store.max_attempts == 4
+    calls: list[int] = []
+
+    def boom(payload: dict[str, Any]) -> None:
+        calls.append(len(calls) + 1)
+        raise RuntimeError("boom")
+
+    runner = JobRunner(store, ingest_fn=boom, retry_delays=(0.0, 0.0, 0.0))
+    store.enqueue("ingest", {"src": "docs/default.md"})
+    states = [runner.tick() for _ in range(4)]
+
+    # 1 次初始 + 3 次重试 = 4 次执行；前 3 次失败后排队重试，第 4 次落 failed。
+    assert calls == [1, 2, 3, 4]
+    assert [state.status for state in states] == [QUEUED, QUEUED, QUEUED, FAILED]
+    assert [state.attempts for state in states] == [1, 2, 3, 4]
+    assert states[-1].finished_at is not None
+    assert runner.tick() is None
+
+
 def test_retry_backoff_default_and_not_due_before_delay(store: JobsStore) -> None:
     def boom(payload: dict[str, Any]) -> None:
         raise RuntimeError("boom")
