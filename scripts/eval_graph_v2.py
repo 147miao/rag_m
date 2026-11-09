@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import statistics
 import sys
 from pathlib import Path
@@ -16,12 +17,10 @@ sys.path.insert(0, str(ROOT / "src"))
 
 from ragm.classifier.factory import build_classifier
 from ragm.config import get_settings
-from ragm.embeddings.embedder import Embedder
 from ragm.embeddings.reranker import build_reranker
 from ragm.graph.kg import KGStore
 from ragm.rag.graph import RagGraph
 from ragm.rag.llm import LLMClient
-from ragm.store.milvus_store import MilvusStore
 from ragm.store.search_service import SearchService
 
 QUESTIONS = [
@@ -44,11 +43,17 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--hops", type=int, nargs="+", default=[1, 2])
     ap.add_argument("--limit", type=int, default=12)
+    ap.add_argument("--collection", default="rag_naruto_chunks")
+    ap.add_argument("--parents", default="/run/media/myj/D/rag_m/data/naruto/parents.jsonl")
+    ap.add_argument("--kg-label", default="NarutoEntity")
+    ap.add_argument("--kg-relation", default="MENTIONS")
     args = ap.parse_args()
+    os.environ["MILVUS_COLLECTION"] = args.collection
+    os.environ["PARENTS_PATH"] = args.parents
+    os.environ["KG_LABEL"] = args.kg_label
+    os.environ["KG_RELATION"] = args.kg_relation
     s = get_settings()
-    emb = Embedder(s.embed_model_path, s.embed_model, s.embed_max_len)
-    store = MilvusStore(s.milvus_uri, s.milvus_collection, emb.dim)
-    search = SearchService(store, emb)
+    search = SearchService(s)
     kg = KGStore(s.neo4j_uri, s.neo4j_user, s.neo4j_password, s.kg_label, s.kg_relation)
     kg.load()
     reranker = build_reranker(s.rerank_model, s.rerank_model_path) if s.rerank_enabled else None
@@ -59,7 +64,7 @@ def main() -> None:
         rag = RagGraph(cls, search, llm, kg=kg, reranker=reranker, max_tokens=s.rag_max_tokens, top_k=s.rag_top_k, multihop_k=s.rag_multihop_k, kg_hops=hops, kg_iterative=hops > 1)
         rows = []
         for q, gold in QUESTIONS[: args.limit]:
-            out = rag.invoke(q)
+            out = rag.invoke(q, route_override="multihop")
             ans = f"{out.get('answer_lead', '')} {out.get('answer_body', '')}"
             rows.append({"q": q, "ok": any(g in ans for g in gold), "graph_added": out.get("graph_added", 0), "lat": out.get("generate_ms", 0)})
         results[f"hops={hops}"] = {"n": len(rows), "correct": sum(1 for r in rows if r["ok"]) / len(rows), "avg_graph_added": round(statistics.mean(r["graph_added"] for r in rows), 2)}

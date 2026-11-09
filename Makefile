@@ -51,6 +51,9 @@ health: ## 检查 Milvus 健康状态
 status: ## 打印实验进度看板（--watch 10 可实时刷新）
 	$(UV) run python scripts/status.py $(if $(WATCH),--watch $(WATCH),)
 
+use-docs: ## 切换 API 到本地文档语料（rag_docs_chunks）
+	scripts/use_corpus.sh docs
+
 use-all: ## 切换 API 到全量语料（演示+火影+论文）
 	scripts/use_corpus.sh all
 

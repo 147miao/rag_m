@@ -112,7 +112,17 @@ python scripts/ingest_docs.py --src ~/my_docs --out data/docs --recreate   # 全
 ```
 
 产物：`data/docs/{parents,children,chunks}.jsonl` + `manifest.json` + `reports/ingest_report.md`。
-入库/查询接入尚未在本轮完成（下一步：`--embed --collection rag_docs` + `make use-docs`）。
+
+编码入库并切换查询（需要 GPU）：
+
+```bash
+python scripts/ingest_docs.py --src ~/my_docs --out data/docs --recreate --embed --recreate
+make use-docs    # API 切到 rag_docs_chunks
+make use-all     # 切回全量语料
+```
+
+实测：项目 docs 19 篇 + arXiv PDF 8 篇（2 篇损坏跳过）→ 573 parents / 3,768 children / **997 chunks**；
+`make use-docs` 后提问「Milvus 的混合检索是怎么实现的？」→ 正确回答、引用 2/2、证据来自 `docs/00-proposal.md`。
 
 ## 三·六、评测与门禁
 
@@ -123,7 +133,9 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 
 - 基线：`tests/fixtures/eval_baseline.json`；检索快照：`tests/fixtures/hits.jsonl`；
 - 指标：Recall@10 / nDCG@10 / MRR / 答案命中 / 引用通过率 / 拒答率 / p50 延迟；
-- 当前基线：nDCG@10 **0.5738**、Recall@10 **0.6714**（35 题：HotpotQA 20 + 火影 10 + arXiv 5）。
+- 当前基线：nDCG@10 **0.5738**、Recall@10 **0.6714**（35 题：HotpotQA 20 + 火影 10 + arXiv 5）；
+- Graph 1 跳 vs 2 跳、Agentic 15 题结果见 [docs/21-graph-agentic-v2.md](docs/21-graph-agentic-v2.md)：
+  Graph 在 12 题上 1.00 vs 1.00（非劣无增益），Agentic accuracy 0.667、p50 3.78s、平均工具 1.53 次、超预算 0。
 
 ## 三·七、CI 与容器
 
@@ -198,6 +210,7 @@ curl -N -X POST localhost:8000/api/query/stream -H "Content-Type: application/js
 | HotpotQA + CMRC 演示语料 | 40,019 chunks | 默认索引，演示三路问答 |
 | 萌娘百科火影忍者（清洗后） | 204 篇 / 71 万字 → 1,112 chunks + 4,548 children | 真实网页文档测试 |
 | arXiv RAG 论文 | 8 篇 PDF → 6 篇有效 / 704 chunks + 3,072 children | 真实长文档测试 |
+| 项目文档 + arXiv（docx 摄取） | 28 个文件 → 997 chunks（`rag_docs_chunks`） | 真实文档摄取 E2E |
 
 Milvus 集合（按实验开）：`rag_all_chunks`（41,835，三语料合并，火影已清洗）、`rag_chunks`（40k）、`rag_children`（46k）、`rag_naruto_chunks/children`、
 `rag_papers_chunks/children`、`rag_long_*`（small-to-big 对照），以及评测用 `nr_emb_*` / `nr_chunk_*`。

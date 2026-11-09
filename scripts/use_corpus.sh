@@ -27,6 +27,16 @@ Environment=KG_LABEL=Entity,NarutoEntity
 Environment=KG_RELATION=CO_EVIDENCE,MENTIONS
 EOF
     ;;
+  docs)
+    REPO="$(cd "$(dirname "$0")/.." && pwd)"
+    cat > "$DROPIN" <<EOF
+[Service]
+Environment=MILVUS_COLLECTION=rag_docs_chunks
+Environment=PARENTS_PATH=$REPO/data/docs/parents.jsonl
+Environment=KG_LABEL=Entity
+Environment=KG_RELATION=CO_EVIDENCE
+EOF
+    ;;
   papers)
     cat > "$DROPIN" <<EOF
 [Service]
@@ -41,7 +51,7 @@ EOF
     rm -f "$DROPIN"
     ;;
   *)
-    echo "usage: $0 default|naruto|papers|all" >&2
+    echo "usage: $0 default|naruto|papers|docs|all" >&2
     exit 1
     ;;
 esac

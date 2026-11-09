@@ -21,6 +21,10 @@ class LLMClient:
         self.temperature = temperature
         self.timeout = timeout
 
+    def _client(self) -> httpx.Client:
+        local = "127.0.0.1" in self.base_url or "localhost" in self.base_url
+        return httpx.Client(timeout=self.timeout, trust_env=not local)
+
     def _payload(self, messages: list[dict], max_tokens: int, stream: bool, json_mode: bool) -> dict:
         body = {
             "model": self.model,
@@ -35,7 +39,7 @@ class LLMClient:
 
     @traceable(run_type="llm", name="llm_chat")
     def chat(self, messages: list[dict], max_tokens: int = 1024, json_mode: bool = False) -> dict:
-        with httpx.Client(timeout=self.timeout) as client:
+        with self._client() as client:
             resp = client.post(
                 f"{self.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
@@ -62,7 +66,7 @@ class LLMClient:
             "tools": tools,
             "tool_choice": "auto",
         }
-        with httpx.Client(timeout=self.timeout) as client:
+        with self._client() as client:
             resp = client.post(
                 f"{self.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
@@ -81,7 +85,7 @@ class LLMClient:
         }
 
     def stream_chat(self, messages: list[dict], max_tokens: int = 1024) -> Iterator[str]:
-        with httpx.Client(timeout=self.timeout) as client, client.stream(
+        with self._client() as client, client.stream(
             "POST",
             f"{self.base_url}/chat/completions",
             headers={"Authorization": f"Bearer {self.api_key}"},
