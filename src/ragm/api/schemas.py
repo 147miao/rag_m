@@ -8,7 +8,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
@@ -113,6 +113,8 @@ class QueryRequest(APIModel):
     route_override: RouteOverride = Field(default="auto", description="auto 表示由分类器决定")
     top_k: int = Field(default=8, ge=1, le=50)
     stream: bool = False
+    # v1.1：提供 session_id 时才启用历史改写 / 子问题拆解
+    session_id: str | None = Field(default=None, description="多轮会话 ID")
 
 
 class QueryResponse(APIModel):
@@ -132,6 +134,11 @@ class QueryResponse(APIModel):
     classifier: ClassifierInfo | None = None
     served_by: ServedBy = "demo"
     generated_at: datetime
+    # v1.1 多轮 / LLM 降级回填字段（默认值保证旧调用方不受影响）
+    session_id: str | None = None
+    rewritten_question: str | None = None
+    subquestions: list[str] = Field(default_factory=list)
+    provider: str | None = None
 
 
 class ScenarioSummary(APIModel):
@@ -221,3 +228,77 @@ class SearchResponse(APIModel):
     mode: str
     latency_ms: float
     hits: list[SearchHit]
+
+
+# ---------- multi-turn sessions (v1.1 W1) ----------
+
+class SessionCreateRequest(APIModel):
+    title: str | None = Field(default=None, max_length=200)
+
+
+class SessionMessage(APIModel):
+    role: str = Field(description="消息角色：user / assistant")
+    content: str
+    created_at: datetime
+
+
+class SessionInfo(APIModel):
+    id: str
+    title: str
+    created_at: datetime
+    updated_at: datetime
+    message_count: int = Field(default=0, ge=0)
+
+
+class SessionDetail(SessionInfo):
+    messages: list[SessionMessage] = Field(default_factory=list)
+
+
+# ---------- MCP (v1.1 W2) ----------
+
+class McpToolInfo(APIModel):
+    name: str
+    description: str = ""
+    requires_confirmation: bool = False
+    input_schema: dict[str, Any] = Field(default_factory=dict)
+
+
+class McpCallRequest(APIModel):
+    tool: str = Field(min_length=1)
+    args: dict[str, Any] = Field(default_factory=dict)
+
+
+class McpCallResponse(APIModel):
+    ok: bool
+    pending: bool | None = None
+    token: str | None = None
+    result: Any = None
+
+
+class McpConfirmRequest(APIModel):
+    token: str = Field(min_length=1)
+
+
+# ---------- async ingest jobs (v1.1 W4) ----------
+
+JobStatus = Literal["queued", "running", "succeeded", "failed"]
+
+
+class JobInfo(APIModel):
+    id: str
+    status: JobStatus
+    attempts: int = Field(default=0, ge=0)
+    max_attempts: int = Field(default=3, ge=1)
+    error: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class JobListResponse(APIModel):
+    jobs: list[JobInfo] = Field(default_factory=list)
+
+
+class IngestRequest(APIModel):
+    src: str = Field(min_length=1, description="待入库的本地文件或目录")
+    collection: str = Field(default="", description="目标 collection；空 = 使用配置默认")
+    recreate: bool = False

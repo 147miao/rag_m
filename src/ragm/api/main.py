@@ -34,8 +34,11 @@ from ..rag.langgraph_service import LangGraphRagService
 from ..rag.llm import LLMClient
 from ..rag.service import DemoRagService
 from ..store.search_service import SearchService
+from .jobs_routes import router as jobs_router
+from .mcp_routes import router as mcp_router
 from .routes import router
 from .schemas import ErrorBody, ErrorResponse
+from .session_routes import router as session_router
 
 logger = logging.getLogger("ragm.api")
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -165,6 +168,10 @@ def create_app() -> FastAPI:
         return response
 
     app.include_router(router)
+    # v1.1 接口骨架：feature 分支在此装配真实实现前，新端点统一返回 501。
+    app.include_router(session_router)
+    app.include_router(mcp_router)
+    app.include_router(jobs_router)
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):
