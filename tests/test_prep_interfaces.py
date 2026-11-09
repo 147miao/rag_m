@@ -1,4 +1,7 @@
-"""prep/v1.1 接口层契约测试：3 个新路由返回 501，新增 schemas 可构造。"""
+"""prep/v1.1 接口层契约测试：session/mcp 路由仍返回 501，新增 schemas 可构造。
+
+W4 jobs 路由已在 feat/jobs 实现（202/404/409/200），行为测试见 tests/test_jobs.py。
+"""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -48,10 +51,7 @@ ROUTE_CASES = [
     ("GET", "/api/mcp/tools", None),
     ("POST", "/api/mcp/call", {"tool": "read_file", "args": {"path": "a.txt"}}),
     ("POST", "/api/mcp/confirm", {"token": "tok"}),
-    ("POST", "/api/ingest", {"src": "docs/a.md"}),
-    ("GET", "/api/jobs/j-test", None),
-    ("GET", "/api/jobs", None),
-    ("POST", "/api/jobs/j-test/retry", None),
+    # jobs 路由已由 feat/jobs 实现，不再属于 501 骨架（见 tests/test_jobs.py）。
 ]
 
 

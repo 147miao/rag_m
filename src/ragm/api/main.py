@@ -29,6 +29,8 @@ from ..classifier.factory import build_classifier
 from ..config import get_settings
 from ..embeddings.reranker import build_reranker
 from ..graph.kg import KGStore
+from ..jobs.runner import JobRunner
+from ..jobs.store import JobsStore
 from ..observability.tracing import configure_tracing
 from ..rag.langgraph_service import LangGraphRagService
 from ..rag.llm import LLMClient
@@ -66,6 +68,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.kg = None
     settings = get_settings()
     configure_tracing(settings)
+    # v1.1 W4：任务表恢复 + 单 worker 线程（JOBS_WORKER=false 时只入队不执行）。
+    app.state.jobs_store = None
+    app.state.jobs_runner = None
+    try:
+        jobs_store = JobsStore(settings.jobs_store_path, max_attempts=settings.jobs_max_attempts)
+        jobs_store.recover()
+        jobs_runner = JobRunner(jobs_store)
+        app.state.jobs_store = jobs_store
+        app.state.jobs_runner = jobs_runner
+        if settings.jobs_worker:
+            jobs_runner.start()
+    except Exception:
+        logger.warning("jobs store unavailable; /api/ingest disabled", exc_info=True)
     try:
         app.state.search = SearchService(settings)
         logger.info("search service ready: %s", app.state.search.info())
@@ -114,6 +129,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         logger.info("rag backend=demo | milvus=%s", settings.milvus_uri)
     yield
+    runner = getattr(app.state, "jobs_runner", None)
+    if runner is not None:
+        runner.shutdown()
     logger.info("ragm api shutdown")
 
 
@@ -131,6 +149,8 @@ def create_app() -> FastAPI:
     app.state.classifier = build_classifier()
     app.state.search = None
     app.state.kg = None
+    app.state.jobs_store = None
+    app.state.jobs_runner = None
 
     app.add_middleware(
         CORSMiddleware,
@@ -168,7 +188,7 @@ def create_app() -> FastAPI:
         return response
 
     app.include_router(router)
-    # v1.1 接口骨架：feature 分支在此装配真实实现前，新端点统一返回 501。
+    # v1.1 接口：jobs 已由 feat/jobs 实现；session/mcp 骨架仍返回 501。
     app.include_router(session_router)
     app.include_router(mcp_router)
     app.include_router(jobs_router)

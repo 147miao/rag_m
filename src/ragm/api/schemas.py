@@ -281,7 +281,7 @@ class McpConfirmRequest(APIModel):
 
 # ---------- async ingest jobs (v1.1 W4) ----------
 
-JobStatus = Literal["queued", "running", "succeeded", "failed"]
+JobStatus = Literal["queued", "running", "succeeded", "failed", "cancelled"]
 
 
 class JobInfo(APIModel):
