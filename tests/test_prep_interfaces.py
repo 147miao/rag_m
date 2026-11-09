@@ -45,9 +45,6 @@ ROUTE_CASES = [
     ("POST", "/api/sessions", {}),
     ("GET", "/api/sessions/s-test", None),
     ("DELETE", "/api/sessions/s-test", None),
-    ("GET", "/api/mcp/tools", None),
-    ("POST", "/api/mcp/call", {"tool": "read_file", "args": {"path": "a.txt"}}),
-    ("POST", "/api/mcp/confirm", {"token": "tok"}),
     ("POST", "/api/ingest", {"src": "docs/a.md"}),
     ("GET", "/api/jobs/j-test", None),
     ("GET", "/api/jobs", None),
@@ -62,6 +59,22 @@ async def test_prep_routes_return_501(client: AsyncClient, method: str, path: st
     body = response.json()
     assert body["error"]["code"] == "http_501"
     assert "not implemented" in body["error"]["message"]
+
+
+# MCP 路由已由 feat/mcp 实现：默认 MCP_ENABLED=false 时返回 503，不再是 501 骨架；
+# 启用/调用/确认流程见 tests/test_mcp.py。
+MCP_ROUTE_CASES = [
+    ("GET", "/api/mcp/tools", None),
+    ("POST", "/api/mcp/call", {"tool": "read_file", "args": {"path": "a.txt"}}),
+    ("POST", "/api/mcp/confirm", {"token": "tok"}),
+]
+
+
+@pytest.mark.parametrize(("method", "path", "json_body"), MCP_ROUTE_CASES)
+async def test_mcp_routes_disabled_return_503(client: AsyncClient, method: str, path: str, json_body) -> None:
+    response = await client.request(method, path, json=json_body)
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "http_503"
 
 
 async def test_prep_routes_registered(client: AsyncClient) -> None:

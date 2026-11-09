@@ -29,6 +29,7 @@ from ..classifier.factory import build_classifier
 from ..config import get_settings
 from ..embeddings.reranker import build_reranker
 from ..graph.kg import KGStore
+from ..mcp import init_mcp
 from ..observability.tracing import configure_tracing
 from ..rag.langgraph_service import LangGraphRagService
 from ..rag.llm import LLMClient
@@ -65,6 +66,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.search = None
     app.state.kg = None
     settings = get_settings()
+    init_mcp(app, settings)
     configure_tracing(settings)
     try:
         app.state.search = SearchService(settings)
