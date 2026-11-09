@@ -1,4 +1,4 @@
-"""prep/v1.1 接口层契约测试：3 个新路由返回 501，新增 schemas 可构造。"""
+"""prep/v1.1 接口层契约测试：未实现的骨架路由返回 501，新增 schemas 可构造。"""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -41,10 +41,8 @@ async def client(monkeypatch):
     get_settings.cache_clear()
 
 
+# 会话接口已由 feat/session 实现（见 tests/test_conversation.py），此处只保留其余骨架路由。
 ROUTE_CASES = [
-    ("POST", "/api/sessions", {}),
-    ("GET", "/api/sessions/s-test", None),
-    ("DELETE", "/api/sessions/s-test", None),
     ("POST", "/api/ingest", {"src": "docs/a.md"}),
     ("GET", "/api/jobs/j-test", None),
     ("GET", "/api/jobs", None),

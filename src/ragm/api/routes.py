@@ -15,7 +15,10 @@ from fastapi.responses import StreamingResponse
 from .. import __version__
 from ..classifier.base import RouteDecision
 from ..config import get_settings
+from ..conversation.rewrite import Rewriter, SessionContext
+from ..conversation.store import SessionStore
 from ..ops.status import collect_status
+from ..rag.llm import LLMClient
 from .examples import examples_for
 from .schemas import (
     ClassifierInfo,
@@ -73,6 +76,79 @@ def _classify_decision(request: Request, question: str) -> RouteDecision:
 
 def _classify(request: Request, question: str) -> ClassifierInfo:
     return ClassifierInfo(**_classify_decision(request, question).as_dict())
+
+
+# ---------- multi-turn session helpers ----------
+def _session_store(request: Request) -> SessionStore:
+    store = getattr(request.app.state, "session_store", None)
+    if store is None:
+        store = SessionStore(get_settings().session_store_path)
+        request.app.state.session_store = store
+    return store
+
+
+def _rewriter(request: Request) -> Rewriter:
+    """测试可注入 app.state.rewriter；默认用主 LLM 配置。"""
+    rewriter = getattr(request.app.state, "rewriter", None)
+    if rewriter is None:
+        settings = get_settings()
+        llm = LLMClient(settings.llm_base_url, settings.llm_model, settings.llm_api_key, settings.llm_temperature)
+        rewriter = Rewriter(llm)
+        request.app.state.rewriter = rewriter
+    return rewriter
+
+
+def _fill_session_fields(resp: QueryResponse, ctx: SessionContext | None) -> QueryResponse:
+    if ctx is None:
+        return resp
+    resp.session_id = ctx.session_id
+    resp.rewritten_question = ctx.rewritten_question
+    resp.subquestions = list(ctx.subquestions)
+    return resp
+
+
+async def _session_context(req: QueryRequest, request: Request) -> SessionContext | None:
+    """取历史 → 指代消解/子问题拆解；无 session_id 时返回 None（保持旧行为）。"""
+    if not req.session_id:
+        return None
+    settings = get_settings()
+    store = _session_store(request)
+    record = await asyncio.to_thread(store.get_session, req.session_id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"session not found: {req.session_id}")
+    history = await asyncio.to_thread(
+        store.get_history, req.session_id, settings.session_max_turns, settings.session_max_chars
+    )
+    rewritten, subquestions = req.question, []
+    if settings.session_rewrite_enabled and history:
+        result = await asyncio.to_thread(_rewriter(request).rewrite, req.question, history)
+        rewritten = str(result.get("rewritten") or req.question)
+        subquestions = [str(item) for item in (result.get("subquestions") or []) if str(item).strip()]
+    return SessionContext(
+        session_id=req.session_id,
+        question=req.question,
+        rewritten_question=rewritten,
+        subquestions=tuple(subquestions),
+    )
+
+
+async def _persist_turn(request: Request, ctx: SessionContext, resp: QueryResponse) -> None:
+    """查询完成后写入用户原话与助手回答，供下一轮改写使用。"""
+    store = _session_store(request)
+    answer = resp.answer.lead
+    if resp.answer.body:
+        answer = f"{answer}\n\n{resp.answer.body}" if answer else resp.answer.body
+    user_meta = {
+        "rewritten_question": ctx.rewritten_question,
+        "subquestions": list(ctx.subquestions),
+    }
+    assistant_meta = {
+        "query_id": resp.id,
+        "route": resp.route,
+        "citations": list(resp.citations),
+    }
+    await asyncio.to_thread(store.append_message, ctx.session_id, "user", ctx.question, user_meta)
+    await asyncio.to_thread(store.append_message, ctx.session_id, "assistant", answer, assistant_meta)
 
 
 # ---------- health ----------
@@ -204,13 +280,21 @@ async def route(req: RouteRequest, request: Request) -> RouteResponse:
 @router.post("/query", response_model=QueryResponse, summary="执行一次 RAG 查询")
 async def query(req: QueryRequest, request: Request) -> QueryResponse:
     service = _query_service(request)
+    ctx = await _session_context(req, request)
     decision = None
     if req.route_override == "auto":
-        decision = _classify_decision(request, req.question)
+        routing_question = ctx.rewritten_question if ctx is not None else req.question
+        decision = _classify_decision(request, routing_question)
         req = req.model_copy(update={"route_override": decision.route})
-    resp = await service.query(req, decision=decision)
+    if ctx is not None and getattr(service, "supports_session", False):
+        resp = await service.query(req, decision=decision, session=ctx)
+    else:
+        resp = await service.query(req, decision=decision)
     if decision is not None:
         resp.classifier = ClassifierInfo(**decision.as_dict())
+    _fill_session_fields(resp, ctx)
+    if ctx is not None:
+        await _persist_turn(request, ctx, resp)
     return resp
 
 
@@ -221,19 +305,28 @@ def _sse(event: str, data: str) -> str:
 @router.post("/query/stream", summary="SSE 流式查询（stage → token → done）")
 async def query_stream(req: QueryRequest, request: Request) -> StreamingResponse:
     service = _query_service(request)
+    ctx = await _session_context(req, request)
     decision = None
     if req.route_override == "auto":
-        decision = _classify_decision(request, req.question)
+        routing_question = ctx.rewritten_question if ctx is not None else req.question
+        decision = _classify_decision(request, routing_question)
         req = req.model_copy(update={"route_override": decision.route})
 
     async def gen():
         try:
-            async for ev in service.stream(req, decision=decision):
+            if ctx is not None and getattr(service, "supports_session", False):
+                stream = service.stream(req, decision=decision, session=ctx)
+            else:
+                stream = service.stream(req, decision=decision)
+            async for ev in stream:
                 if isinstance(ev, StageEvent):
                     yield _sse("stage", ev.model_dump_json(by_alias=True))
                 elif isinstance(ev, TokenEvent):
                     yield _sse("token", ev.model_dump_json(by_alias=True))
                 elif isinstance(ev, DoneEvent):
+                    _fill_session_fields(ev.response, ctx)
+                    if ctx is not None:
+                        await _persist_turn(request, ctx, ev.response)
                     yield _sse("done", ev.model_dump_json(by_alias=True))
         except Exception as exc:  # noqa: BLE001 - SSE 内部错误以事件返回
             body = ErrorResponse(
