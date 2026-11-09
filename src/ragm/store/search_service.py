@@ -84,8 +84,24 @@ class SearchService:
         )
         return [dict(r) for r in rows]
 
+    def _child_status(self) -> tuple[bool, str | None]:
+        """子集合是否可用；集合缺失时不应让整个 SearchService 初始化失败。"""
+        collection = self.child_store.collection
+        try:
+            exists = bool(self.child_store.client.has_collection(collection))
+        except Exception as exc:  # noqa: BLE001 - 连接/权限异常类型由 pymilvus 决定
+            return False, f"{type(exc).__name__}: {str(exc)[:200]}"
+        if not exists:
+            return False, f"child collection not found: {collection}"
+        return True, None
+
     def search_small2big(self, query: str, k: int = 8, k_children: int = 50) -> dict:
         """小块检索（精确性）→ 父块上下文（丰富性），按 parent 去重后返回 top-k。"""
+        child_ready, child_error = self._child_status()
+        if not child_ready:
+            raise RuntimeError(
+                f"small2big unavailable: child collection '{self.child_store.collection}' not ready ({child_error})"
+            )
         t0 = time.perf_counter()
         qvec = self.embedder.encode_queries([query])[0].tolist()
         children = self.child_store.hybrid_search(query, qvec, k_children)
@@ -121,11 +137,21 @@ class SearchService:
         }
 
     def info(self) -> dict:
+        child_ready, child_error = self._child_status()
+        child_rows = None
+        if child_ready:
+            try:
+                child_rows = self.child_store.count()
+            except Exception as exc:  # noqa: BLE001 - 子集合统计失败不应拖垮主检索服务
+                child_ready = False
+                child_error = f"{type(exc).__name__}: {str(exc)[:200]}"
         return {
             "collection": self.store.collection,
             "rows": self.store.count(),
             "child_collection": self.child_store.collection,
-            "child_rows": self.child_store.count(),
+            "child_rows": child_rows,
+            "child_ready": child_ready,
+            "child_error": child_error,
             "parents_loaded": len(self.parents),
             "model": self.embedder.path,
             "dim": self.embedder.dim,

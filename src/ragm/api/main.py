@@ -101,6 +101,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             app.state.classifier, app.state.search, llm, settings, kg=app.state.kg, agent=agent, executor=executor, reranker=reranker
         )
         logger.info("rag backend=langgraph | llm=%s | kg=%s | agent tools=%s", settings.llm_model, app.state.kg is not None, True)
+    elif settings.rag_backend == "langgraph":
+        if settings.rag_allow_demo_fallback:
+            logger.warning(
+                "rag backend=langgraph but search unavailable; serving demo because RAG_ALLOW_DEMO_FALLBACK=true"
+            )
+        else:
+            logger.error("rag backend=langgraph but search unavailable; /api/query will return 503")
     else:
         logger.info("rag backend=demo | milvus=%s", settings.milvus_uri)
     yield
@@ -119,6 +126,8 @@ def create_app() -> FastAPI:
     app.state.started_at = time.monotonic()
     app.state.service = DemoRagService()
     app.state.classifier = build_classifier()
+    app.state.search = None
+    app.state.kg = None
 
     app.add_middleware(
         CORSMiddleware,

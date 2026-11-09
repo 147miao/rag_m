@@ -4,11 +4,13 @@ from __future__ import annotations
 import contextlib
 import fcntl
 import json
+import logging
 import subprocess
 import threading
 import time
 from pathlib import Path
 
+logger = logging.getLogger(__name__)
 CACHE = Path("/run/media/myj/D/rag_m/cache/bench")
 GPU_LOCK = CACHE / "gpu.lock"
 
@@ -25,11 +27,11 @@ def gpu_lock():
 
 
 def stop_api() -> None:
-    subprocess.run(["systemctl", "--user", "stop", "ragm-api.service"], capture_output=True)
+    subprocess.run(["systemctl", "--user", "stop", "ragm-api.service"], check=False, capture_output=True)
 
 
 def start_api() -> None:
-    subprocess.run(["systemctl", "--user", "start", "ragm-api.service"], capture_output=True)
+    subprocess.run(["systemctl", "--user", "start", "ragm-api.service"], check=False, capture_output=True)
 
 
 def candidate_path(collection: str, query: str, mode: str, k: int) -> Path:
@@ -43,8 +45,8 @@ def cached_hits(collection: str, query: str, mode: str, k: int, compute):
     if path.exists():
         try:
             return json.loads(path.read_text(encoding="utf-8"))
-        except Exception:
-            pass
+        except (OSError, ValueError) as exc:
+            logger.warning("candidate cache unreadable, recomputing %s: %s", path, exc)
     hits = compute()
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(hits, ensure_ascii=False), encoding="utf-8")
@@ -57,7 +59,7 @@ class UsageMonitor:
         self._stop = threading.Event()
         self._thread = threading.Thread(target=self._run, daemon=True)
 
-    def start(self) -> "UsageMonitor":
+    def start(self) -> UsageMonitor:
         self._thread.start()
         return self
 
@@ -97,7 +99,13 @@ class UsageMonitor:
     @staticmethod
     def _gpu_util():
         try:
-            out = subprocess.run(["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"], capture_output=True, text=True, timeout=3).stdout.strip().splitlines()[0]
+            out = subprocess.run(
+                ["nvidia-smi", "--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"],
+                check=False,
+                capture_output=True,
+                text=True,
+                timeout=3,
+            ).stdout.strip().splitlines()[0]
             return int(out)
-        except Exception:
+        except (OSError, subprocess.SubprocessError, ValueError, IndexError):
             return None

@@ -2,10 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 
 from pypdf import PdfReader
+
+logger = logging.getLogger(__name__)
 
 PDF_DIR = Path("/run/media/myj/D/rag_m/data/papers/pdf")
 OUT = Path("/run/media/myj/D/rag_m/data/papers")
@@ -30,7 +33,8 @@ def main() -> None:
         try:
             reader = PdfReader(str(pdf))
             text = "\n".join((p.extract_text() or "") for p in reader.pages)
-        except Exception:
+        except Exception as exc:  # noqa: BLE001 - 损坏/加密 PDF 的异常类型不稳定，跳过单个文件即可
+            logger.warning("skip unreadable pdf %s: %s", pdf.name, exc)
             continue
         text = re.sub(r"\s+", " ", text).strip()
         if len(text) < 3000:

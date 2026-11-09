@@ -21,14 +21,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install --index-url https://download.pytorch.org/whl/cpu torch==2.15.0
           pip install -e .
-          pip install pytest pytest-asyncio ruff
+          pip install pytest pytest-asyncio pytest-cov ruff
       - name: Lint
-        run: . .venv/bin/activate && ruff check src tests
+        run: . .venv/bin/activate && ruff check src tests scripts
       - name: Tests
         env:
           CLASSIFIER_BACKEND: rules
           RAG_BACKEND: demo
-        run: . .venv/bin/activate && pytest tests -q
+        run: . .venv/bin/activate && pytest tests -q --cov=ragm --cov-report=term-missing
       - name: Retrieval gate (deterministic fixture)
         run: . .venv/bin/activate && python scripts/eval_all.py --suite retrieval --fixture-only
 

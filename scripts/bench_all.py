@@ -61,7 +61,7 @@ def main() -> None:
     api.terminate()
     try:
         api.wait(timeout=10)
-    except Exception:
+    except subprocess.TimeoutExpired:
         api.kill()
     start_api()
     summary = {"wall_s": round(time.perf_counter() - t0, 1), "usage": usage}

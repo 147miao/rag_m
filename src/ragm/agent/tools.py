@@ -92,7 +92,8 @@ class ToolExecutor:
         names = [n for n in self.kg.names if entity and entity.lower() in n.lower()][:3]
         if not names:
             return {"ok": True, "tool": "kg_query", "entity": entity, "paths": [], "neighbors": [], "note": "实体未命中图谱"}
-        edges, neighbors = self.kg.expand(names, limit=30)
+        hops = max(1, min(int(hops or 1), 2))
+        edges, neighbors = self.kg.expand_hops(names, hops=hops, limit=30)
         paths = [
             {"a": e["a"], "b": e["b"], "type": e.get("qtype") or "co_evidence", "question": (e.get("question") or "")[:120]}
             for e in edges[:12]

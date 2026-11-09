@@ -53,6 +53,17 @@ def _write_rows(out: Path, doc_id: str, payload: dict) -> None:
     (rows_dir / f"{doc_id}.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
 
 
+def _drop_cached_rows(out: Path, manifest: dict, rel: str) -> str | None:
+    """删除某文件的缓存 rows 与 manifest 条目，返回被移除的旧 doc_id。"""
+    old = manifest["files"].pop(rel, None)
+    if not old:
+        return None
+    doc_id = old.get("doc_id")
+    if doc_id:
+        (out / ROWS_DIR / f"{doc_id}.json").unlink(missing_ok=True)
+    return doc_id
+
+
 def build(
     src: Path,
     out: Path,
@@ -72,7 +83,13 @@ def build(
 
     files = scan(src)
     seen: set[str] = set()
-    parsed, skipped, failed = [], [], []
+    parsed, skipped, failed, deleted = [], [], [], []
+    stale_doc_ids: list[str] = []
+
+    def mark_stale(doc_id: str | None) -> None:
+        if doc_id and doc_id not in stale_doc_ids:
+            stale_doc_ids.append(doc_id)
+
     for path in files:
         rel = str(path.relative_to(src))
         seen.add(rel)
@@ -88,11 +105,13 @@ def build(
         try:
             sections = read_file(path)
             if not sections:
+                mark_stale(_drop_cached_rows(out, manifest, rel))
                 skipped.append(rel)
                 continue
             doc_id = doc_id_for(digest, rel)
             parents, children, chunks = build_rows(rel, digest, sections, lang=lang, source=source)
             if not chunks:
+                mark_stale(_drop_cached_rows(out, manifest, rel))
                 skipped.append(rel)
                 continue
             _write_rows(out, doc_id, {
@@ -104,18 +123,17 @@ def build(
                 "counts": {"parents": len(parents), "children": len(children), "chunks": len(chunks)},
                 "size": path.stat().st_size,
             }
+            if old and old.get("doc_id") != doc_id:
+                mark_stale(old.get("doc_id"))
             parsed.append(rel)
         except Exception as exc:  # noqa: BLE001
             failed.append({"file": rel, "error": f"{type(exc).__name__}: {exc}"})
 
-    # 删除已不存在的文件
+    # 删除已不存在的文件（同步清理 rows / manifest / Milvus 旧 doc_id）
     for rel in list(manifest["files"].keys()):
         if rel not in seen:
-            doc_id = manifest["files"][rel].get("doc_id", "")
-            p = out / ROWS_DIR / f"{doc_id}.json"
-            if p.exists():
-                p.unlink()
-            del manifest["files"][rel]
+            mark_stale(_drop_cached_rows(out, manifest, rel))
+            deleted.append(rel)
 
     # 汇总 JSONL
     parents, children, chunks = [], [], []
@@ -132,7 +150,8 @@ def build(
     save_manifest(out, manifest)
     return {
         "files_total": len(files), "parsed": len(parsed), "skipped": len(skipped), "failed": len(failed),
-        "changed_files": parsed, "failed_files": failed,
+        "changed_files": parsed, "deleted_files": deleted, "stale_doc_ids": stale_doc_ids,
+        "failed_files": failed,
         "parents": len(parents), "children": len(children), "chunks": len(chunks),
         "out": str(out),
     }

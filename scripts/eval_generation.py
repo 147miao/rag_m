@@ -95,7 +95,7 @@ def ask_json(prompt: str) -> dict:
             fence = chr(96) * 3
             raw = re.sub(r"^" + fence + r"[a-zA-Z]*\n?", "", raw)
             raw = re.sub(r"\n?" + fence + r"$", "", raw).strip()
-            m = re.search(r"\{.*\}", raw, re.S)
+            m = re.search(r"\{.*\}", raw, re.DOTALL)
             if m:
                 return json.loads(m.group(0))
         except Exception:  # noqa: BLE001

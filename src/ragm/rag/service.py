@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from typing import Protocol
 
 from ..api.schemas import (
+    ClassifierInfo,
     DoneEvent,
     QueryRequest,
     QueryResponse,
@@ -20,6 +21,7 @@ from ..api.schemas import (
     StageEvent,
     TokenEvent,
 )
+from ..classifier.base import RouteDecision
 from .demo import DEMO_SCENARIOS
 
 StreamEvent = StageEvent | TokenEvent | DoneEvent
@@ -30,9 +32,11 @@ class RagService(Protocol):
 
     def scenarios(self) -> list[ScenarioSummary]: ...
 
-    async def query(self, req: QueryRequest) -> QueryResponse: ...
+    async def query(self, req: QueryRequest, decision: RouteDecision | None = None) -> QueryResponse: ...
 
-    def stream(self, req: QueryRequest) -> AsyncIterator[StreamEvent]: ...
+    def stream(
+        self, req: QueryRequest, decision: RouteDecision | None = None
+    ) -> AsyncIterator[StreamEvent]: ...
 
 
 class DemoRagService:
@@ -83,12 +87,19 @@ class DemoRagService:
             for s in DEMO_SCENARIOS
         ]
 
-    async def query(self, req: QueryRequest) -> QueryResponse:
-        return self._build(req, self._pick(req))
+    async def query(self, req: QueryRequest, decision: RouteDecision | None = None) -> QueryResponse:
+        resp = self._build(req, self._pick(req))
+        if decision is not None:
+            resp.classifier = ClassifierInfo(**decision.as_dict())
+        return resp
 
-    async def stream(self, req: QueryRequest) -> AsyncIterator[StreamEvent]:
+    async def stream(
+        self, req: QueryRequest, decision: RouteDecision | None = None
+    ) -> AsyncIterator[StreamEvent]:
         scenario = self._pick(req)
         response = self._build(req, scenario)
+        if decision is not None:
+            response.classifier = ClassifierInfo(**decision.as_dict())
 
         for index, step in enumerate(response.trace):
             await asyncio.sleep(min(0.35, step.ms / 1000 * self.delay_scale))

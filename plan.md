@@ -1,85 +1,79 @@
-# RAG-M v1.0 进化计划（2026-11-08，rev.2）
+# v1.1 计划：多轮会话 / MCP / LLM 降级 / 异步入库（2026-11-09）
 
-> 定位：学习 + 作品集。本轮把"实验原型"推进到"有真实文档摄取、有评测门禁、可一键部署"的 v1.0。
-> rev.2 吸收独立审核意见：修正 CI/容器/摄取契约/验收标准/并行边界。
+## 0. 需求核对清单（用户原话）
 
-## 0. 现状与问题
+1. **多轮会话 + 查询改写/子问题拆解（1~2 天）**：会话历史存 SQLite/Redis，检索前做指代消解 + 子问题分解。
+2. **MCP 工具接入 + 敏感操作确认（1~2 天）**：用 Python MCP SDK 接一个示例 MCP Server，加 requires_confirmation 拦截。
+3. **LLM 多 provider + 首包超时/熔断/降级（1 天）**：OpenAI 兼容适配 + 首 token 超时探测 + 候选模型降级。
+4. **入库异步队列 + 状态机/重试（1 天）**：Celery/RQ 或 FastAPI BackgroundTasks + 任务表状态机。
 
-- 语料是公开数据集，没有"用户文档"接入链路；`src/ragm/ingest`、`src/ragm/eval` 仍是空模块；
-- 评测脚本散落在 `scripts/`（bench_*.py / eval_*.py），无统一入口、无回归门禁；
-- 无 CI、无应用 Dockerfile、无鉴权/限流；Milvus/Neo4j 容器当前停止，API degraded；
-- Graph RAG 仅 1 跳；Agentic 已是 plan→tools 循环，但无预算/重试；
-- re`ruff check src tests scripts` 有 22 个历史错误（scripts 为主），需先收敛范围。
+## 0.1 默认选择（用户未在提问窗口回答，按推荐项执行；可随时改）
 
-## 1. 验收标准（可测、可证伪）
-
-| # | 标准 | 证据/判定 |
+| 维度 | 选择 | 理由 |
 |---|---|---|
-| A1 | 摄取 PDF/DOCX/EPUB/MD 各 ≥2 个文件，一条命令生成 parent/child/chunk | `data/docs/` 三个 jsonl + `reports/ingest_report.md` |
-| A2 | 幂等：同目录重复执行 second run inserted=0、skipped=N；文件修改后旧 chunk 清理（按 file_hash 删除旧 doc_id） | 两次运行报告 + Milvus 行数 |
-| A3 | 长文档（>2000 字）自动 parent/child；查询默认 small-to-big（父块作上下文） | 集合统计 + 查询命中 parent 文本 |
-| A4 | 统一评测入口：`python scripts/eval_all.py --suite all` 输出 ≥80 题的检索+生成报告 | `reports/eval_report.md` |
-| A5 | 门禁：确定性检索门禁（无 LLM/GPU，固定 fixture）在 CI 运行，相对基线下降 >0.02 则失败 | CI 日志 / `make gate` |
-| A6 | 容器：`docker compose --profile app up` 起 API（含 torch，GPU 直通）+ web 静态；`/readyz` 返回 200 且 status=ok | 容器日志 + curl |
-| A7 | CI：push 触发 ruff（src tests）+ pytest + web build，全绿 | Actions 链接 |
-| A8 | Graph RAG 2.0：2 跳+迭代检索；在 **40 题 held-out** 多跳集上相对 hybrid-only 非劣（ΔnDCG ≥ -0.01）且准确率不低于 v1 | 对照报告 `reports/graph_v2_vs_v1.md` |
-| A9 | Agentic 2.0：预算（≤4 次工具、≤8000 tokens）+ 失败重试；15 题 accuracy ≥ v1、p50 ≤3.5s、异常=0 | 报告 `reports/agentic_v2.md` |
-| A10 | 文档同步：README 增加 INGEST/EVAL/OPS 小节；`plan.md` 与本表一致 | README diff |
+| 会话存储 | **SQLite**（`data/sessions.sqlite`） | 零依赖、重启不丢；Redis 留接口 `SESSION_BACKEND` |
+| 会话处理 | **指代消解 + 子问题拆解** | LLM JSON 输出 + 规则兜底；拆解结果做多查询检索 |
+| MCP 示例 | 自写 Python MCP Server（`mcp.server.MCPServer`），工具：`list_dir` / `read_file` / `write_note`；`write_note` 需确认 | 可完全本地跑，无需外部服务；确认流走 API token |
+| LLM provider | Ollama `gemma4:31b-cloud`（主）→ Ollama `deepseek-v4.1-flash:cloud`（备）；DeepSeek 官方 key 存在时优先接官方 | 本机已有两个模型，无需外部 key 即可演示降级 |
+| 队列 | **FastAPI BackgroundTasks + SQLite 任务表** | 零新依赖、状态可持久化、重启可恢复；不引入 Redis |
 
-## 2. 关键设计决策（冻结接口，避免并行冲突）
+## 1. 验收标准
 
-1. **Milvus schema 不改**：沿用 `chunk_id/doc_id/title/source/lang/chunk_index/text/dense`；
-   `page/section/file_hash` 写入 manifest（`data/docs/manifest.json`），`title` 形如 `file.pdf · p3 · 第2章`；
-   这样 W1 不需要改 `milvus_store.py`（避免与 W3/W5 冲突）。
-2. **摄取入口**：`scripts/ingest_docs.py --src <dir>` 只做解析+切块+写 JSONL（无 GPU）；
-   `--embed --collection rag_docs` 时才编码入库（复用现有 Embedder 与 `ingest_milvus.py` 逻辑）。
-3. **数据目录**：`data/docs/{parents,children,chunks}.jsonl` + `manifest.json`；数据仍走 D 盘软链。
-4. **评测基线**：`tests/fixtures/eval_baseline.json`（随仓库提交），CI 只跑检索门禁；生成评测在本地 `make eval`。
-5. **容器数据**：数据/模型放 `$HOME/ragm_data`（Docker Desktop 只共享 $HOME），compose 用服务名互连；
-   `host.docker.internal` + `extra_hosts: host-gateway` 访问宿主 Ollama。
-6. **默认小步快跑**：Graph 2.0 先复用现有 CO_EVIDENCE/MENTIONS 图做 2 跳+迭代，LLM 三元组作为可选开关（默认关）。
-
-## 3. 工作流与文件所有权
-
-| 工作流 | Owner | 文件范围 | 交付 |
-|---|---|---|---|
-| W1 摄取 | 子 agent A（general） | `src/ragm/ingest/*`、`scripts/ingest_docs.py`、`tests/test_ingest.py`、`data/docs/` | A1~A3 |
-| W2 评测 | 子 agent B（general） | `src/ragm/eval/*`、`scripts/eval_all.py`、`tests/test_eval.py`、`tests/fixtures/eval_*` | A4~A5 |
-| W3 工程 | 子 agent C（general） | `docker/Dockerfile.api`、`docker/compose.yaml`、`.github/workflows/ci.yml`、`.dockerignore`、`Makefile`、`scripts/ci.sh` | A6~A7 |
-| W4 Graph | 主 agent | `src/ragm/graph/*`、`src/ragm/rag/graph.py`、`scripts/eval_graph_v2.py` | A8 |
-| W5 Agentic | 主 agent | `src/ragm/agent/*`、`scripts/eval_agentic.py` | A9 |
-| 集成/文档 | 主 agent | `README.md`、`docs/21-*`、`docs/22-*`、截图、提交/push | A10 |
-
-共享文件（`config.py`、`milvus_store.py`、`api/routes.py`、`Makefile`）由主 agent 统一改，子 agent 只读或提 patch 建议。
-
-## 4. 执行顺序
-
-1. 恢复环境（Milvus/Neo4j/API）——主 agent 立即做；
-2. 并行：W1、W2、W3（目录不重叠）；主 agent 同时做 W4 的 2 跳/迭代（不新增 LLM 抽取）；
-3. W4/W5 完成 → 用 W1 新文档语料复测；
-4. 集成：README/docs/截图；push；
-5. 独立 acceptance + completeness 审核（fresh），按 A1~A10 逐条核验。
-
-## 5. 风险与回退
-
-| 风险 | 缓解 | 回退 |
+| # | 标准 | 证据 |
 |---|---|---|
-| GPU 8GB 被占（当前 API 占 2.5GB） | 摄取只解析不编码；编码前停 systemd API；GPU 锁（复用 bench_common） | 用户释放 GPU 后再跑 |
-| 新格式解析失败 | 逐文件 try/except，报告 skipped 清单 | 保留原文件，人工转 PDF |
-| CI 装 torch 过重 | CI 只装 dev 依赖（不装 torch），只在 lint/test 用 rules+demo 后端 | 拆分 requirements-ci.txt |
-| 门禁误报 | 基线固定 + 阈值 0.02 + `--no-gate` | 手动更新基线需 review |
-| 子 agent 冲突 | 文件所有权表 + 合并前 git diff | 冲突时主 agent 手工合并 |
+| A1 | 会话 CRUD 持久化：创建→追加→重启后仍能读回 | `tests/test_conversation.py` + sqlite 文件 |
+| A2 | 带 session_id 的 query 会做指代消解（"他/这个"→具体实体） | API 响应 `rewritten_question` |
+| A3 | 子问题拆解 ≥2 时多查询检索并去重合并 | 响应 `subquestions` + 命中数 |
+| A4 | MCP 客户端能 list_tools 并调用只读工具 | 单测/接口输出 |
+| A5 | 敏感工具（write_note）未确认前不执行，返回 requires_confirmation+token | API 响应 + 文件系统断言 |
+| A6 | 确认接口消费 token 后执行，token 单次有效 | 二次调用 410/400 |
+| A7 | 主 provider 首 token 超时（默认 8s）自动切备 provider | 假 provider 单测 |
+| A8 | 熔断：连续 3 次失败后 60s 内不再尝试该 provider | 单测状态机 |
+| A9 | /api/health 暴露 provider 状态（ok/circuit_open） | health JSON |
+| A10 | 入库任务 enqueue→running→succeeded；失败重试 3 次后 failed | 任务表 + `/api/jobs/{id}` |
+| A11 | 重启后 running 任务恢复为 queued/failed，不丢任务 | 单测/实测 |
+| A12 | `pytest` 全过、`ruff check src tests scripts` 全绿、`pnpm build` 通过 | CI |
 
-## 6. 验证
+## 2. 设计（文件所有权）
 
-- 单测：`pytest tests -q`；新增 test_ingest（解析/幂等）、test_eval（指标）；
-- E2E：真实 PDF/DOCX/EPUB → 解析 → 检索 → 问答；
-- `make gate`（确定性检索门禁）；`make eval`（含生成，需 LLM）；
-- `docker compose --profile app up` + `/readyz`；
-- acceptance/completeness 两个 fresh 子 agent 独立核验。
+| 工作流 | 新增/修改 | 说明 |
+|---|---|---|
+| W1 会话 | `src/ragm/conversation/{store,rewrite,__init__}.py`、`api/conversation_routes.py`、`tests/test_conversation.py` | SQLite 表 sessions/messages；Rewriter 输出 {rewritten, subquestions}；`QueryRequest.session_id` |
+| W2 MCP | `src/ragm/mcp/{server,client,confirmation}.py`、`agent/mcp_tools.py`、`api/mcp_routes.py`、`tests/test_mcp.py` | 自写 server；Client 用 `mcp.Client(StdioServerParameters(["python","-m","ragm.mcp.server"]))`；确认表存 SQLite |
+| W3 LLM | `src/ragm/rag/llm_router.py`、`rag/llm.py`（保持兼容）、`config.py`、`api` health、`tests/test_llm_router.py` | Provider 列表、首 token 超时、CircuitBreaker、降级 |
+| W4 队列 | `src/ragm/jobs/{store,runner,__init__}.py`、`api/jobs_routes.py`、`main.py` 启动 worker、`tests/test_jobs.py` | SQLite jobs 表；BackgroundTasks 触发 + 独立 worker 线程；状态机/重试 |
+| 集成 | 主 agent | 各路由模块 `include_router`、config 字段、README/docs、合并冲突 |
 
-## 7. 不在本轮范围
+## 3. 接口草案
 
-- 前端产品化（多会话/上传/设置/暗色）；鉴权体系（仅预留 API key）；
-- 扫描版 PDF OCR（先支持文本层 PDF）；
-- 大规模分布式索引。
+- `POST /api/sessions` → `{id,title}`；`GET /api/sessions/{id}` → 历史消息；
+- `POST /api/query` 增加 `session_id`；响应增加 `rewritten_question`、`subquestions`、`session_id`；
+- `GET /api/mcp/tools` → 工具清单（含 requires_confirmation）；
+- `POST /api/confirm` `{token}` → 执行挂起工具；
+- `GET /api/llm/providers`（或并入 health）；
+- `POST /api/ingest` `{src, collection, recreate}` → `{job_id}`；`GET /api/jobs/{job_id}`；`POST /api/jobs/{job_id}/retry`。
+
+## 4. 约束
+
+- 保持现有 41 tests 全过；新增每个功能至少 3 条测试（含失败路径）；
+- 不新增容器（SQLite 方案）；新增依赖仅 `mcp>=2.3.0`；
+- 单文件 ≤700 行；配置项集中在 `config.py`；
+- 子 agent 在独立 worktree 工作，分支 `feat/<name>`，不 push、不合并；主 agent 负责合并与冲突解决。
+
+## 5. 风险
+
+| 风险 | 缓解 |
+|---|---|
+| 4 个分支都改 routes/main/config | 各功能独立 router 模块；主 agent 只加 include_router 与 config 字段；合并前跑全量测试 |
+| MCP stdio 子进程与 GPU 无关，但依赖 `mcp` 包安装 | 固定 `mcp>=2.3.0`；单测用 in-memory `Client(MCPServer)` 避免子进程 |
+| 会话改写增加 LLM 延迟（+0.5~1s） | 只在有 session_id 且历史非空时触发；失败回退原文 |
+| LLM 降级导致答案风格不一致 | 统一 prompt；记录 `provider` 字段 |
+| BackgroundTasks 进程退出丢任务 | 任务表持久化 + 启动恢复 running→queued |
+| 与 fix/p0 分支冲突 | fix/p0 验收通过后先合并 main，再开 feature worktree |
+
+## 6. 不在本轮范围
+
+- 前端会话 UI / MCP 确认弹窗（先把 API 与测试做扎实，前端下一步）；
+- Redis 会话/队列；
+- 远程 MCP（HTTP transport）与 OAuth；
+- 文件 multipart 上传（`/api/ingest` 接受服务器路径）。
