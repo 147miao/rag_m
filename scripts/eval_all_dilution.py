@@ -56,7 +56,7 @@ def metrics(ranked, golds):
             idcg = sum(1 / np.log2(i + 2) for i in range(min(len(gs), k)))
             nd.append(dcg / idcg if idcg else 0.0)
             mrr.append(next((1 / (i + 1) for i, d in enumerate(top) if d in gs), 0.0))
-        out["recall@%d" % k] = round(float(np.mean(rec)), 4)
+        out[f"recall@{k}"] = round(float(np.mean(rec)), 4)
         if k == 10:
             out["ndcg@10"] = round(float(np.mean(nd)), 4)
             out["mrr@10"] = round(float(np.mean(mrr)), 4)

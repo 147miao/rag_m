@@ -11,6 +11,7 @@ from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
 
+from ..classifier.base import override_decision
 from ..embeddings.reranker import BaseReranker
 from ..graph.kg import KGStore
 from .citations import verify_citations
@@ -23,6 +24,7 @@ ROUTE_TOP_K = {"simple": 8, "multihop": 12, "agentic": 12}
 class RagState(TypedDict, total=False):
     question: str
     route_override: str
+    classifier_decision: Any
     route: str
     label: str
     confidence: float
@@ -117,8 +119,19 @@ class RagGraph:
 
     # ---------- nodes ----------
     def _classify_node(self, state: RagState) -> dict:
-        t0 = time.perf_counter()
-        decision = self.classifier.classify(state["question"])
+        """复用上游分类结果；显式路由时合成决策，只有 auto 且无缓存时才真正分类。"""
+        decision = state.get("classifier_decision")
+        if decision is None:
+            route_override = state.get("route_override", "auto")
+            if route_override == "auto":
+                t0 = time.perf_counter()
+                decision = self.classifier.classify(state["question"])
+                classify_ms = round((time.perf_counter() - t0) * 1000, 1)
+            else:
+                decision = override_decision(route_override)
+                classify_ms = 0.0
+        else:
+            classify_ms = round(float(getattr(decision, "latency_ms", 0.0)), 1)
         route = decision.route if state.get("route_override", "auto") == "auto" else state["route_override"]
         return {
             "label": decision.label,
@@ -126,7 +139,7 @@ class RagGraph:
             "confidence": round(float(decision.confidence), 4),
             "reason": decision.reason,
             "classifier_backend": decision.backend,
-            "classify_ms": round((time.perf_counter() - t0) * 1000, 1),
+            "classify_ms": classify_ms,
         }
 
     def _retrieve_node(self, state: RagState) -> dict:
@@ -244,11 +257,16 @@ class RagGraph:
         return g.compile()
 
     # ---------- public ----------
-    def invoke(self, question: str, route_override: str = "auto") -> RagState:
-        return self._graph.invoke({"question": question, "route_override": route_override})
-
-    def prepare(self, question: str, route_override: str = "auto") -> RagState:
+    def invoke(self, question: str, route_override: str = "auto", decision: Any | None = None) -> RagState:
         state: RagState = {"question": question, "route_override": route_override}
+        if decision is not None:
+            state["classifier_decision"] = decision
+        return self._graph.invoke(state)
+
+    def prepare(self, question: str, route_override: str = "auto", decision: Any | None = None) -> RagState:
+        state: RagState = {"question": question, "route_override": route_override}
+        if decision is not None:
+            state["classifier_decision"] = decision
         state.update(self._classify_node(state))
         state.update(self._retrieve_node(state))
         return state

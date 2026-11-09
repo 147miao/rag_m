@@ -26,7 +26,7 @@ from ..api.schemas import (
     ToolCall,
     TraceStep,
 )
-from ..classifier.base import ROUTE_TO_LABEL
+from ..classifier.base import ROUTE_TO_LABEL, RouteDecision, override_decision
 from ..config import Settings
 from ..graph.kg import KGStore
 from .demo import DEMO_SCENARIOS
@@ -193,22 +193,32 @@ class LangGraphRagService:
             "refusal": astate.get("refusal"),
         }
 
-    async def query(self, req: QueryRequest) -> QueryResponse:
+    async def _decision_for(self, req: QueryRequest, decision: RouteDecision | None) -> RouteDecision:
+        """复用 API 层已完成的分类；只有缺少决策且路由为 auto 时才调用分类器。"""
+        if decision is not None:
+            return decision
+        if req.route_override == "auto":
+            return await asyncio.to_thread(self.rag.classifier.classify, req.question)
+        return override_decision(req.route_override)
+
+    async def query(self, req: QueryRequest, decision: RouteDecision | None = None) -> QueryResponse:
         t0 = time.perf_counter()
+        decision = await self._decision_for(req, decision)
         if self.agent is not None:
-            decision = await asyncio.to_thread(self.rag.classifier.classify, req.question)
             route = decision.route if req.route_override == "auto" else req.route_override
             if route == "agentic":
                 astate = await asyncio.to_thread(self.agent.invoke, req.question)
                 state = self._agent_state(decision, route, astate)
                 return self._build(req, state, int((time.perf_counter() - t0) * 1000))
-        state = await asyncio.to_thread(self.rag.invoke, req.question, req.route_override)
+        state = await asyncio.to_thread(self.rag.invoke, req.question, req.route_override, decision)
         return self._build(req, state, int((time.perf_counter() - t0) * 1000))
 
-    async def stream(self, req: QueryRequest) -> AsyncIterator[StageEvent | TokenEvent | DoneEvent]:
+    async def stream(
+        self, req: QueryRequest, decision: RouteDecision | None = None
+    ) -> AsyncIterator[StageEvent | TokenEvent | DoneEvent]:
         t0 = time.perf_counter()
+        decision = await self._decision_for(req, decision)
         if self.agent is not None:
-            decision = await asyncio.to_thread(self.rag.classifier.classify, req.question)
             route = decision.route if req.route_override == "auto" else req.route_override
             if route == "agentic":
                 astate = await asyncio.to_thread(self.agent.invoke, req.question)
@@ -221,7 +231,7 @@ class LangGraphRagService:
                     await asyncio.sleep(0.01)
                 yield DoneEvent(response=self._build(req, state, int((time.perf_counter() - t0) * 1000)))
                 return
-        state = await asyncio.to_thread(self.rag.prepare, req.question, req.route_override)
+        state = await asyncio.to_thread(self.rag.prepare, req.question, req.route_override, decision)
         steps = [
             ("route", "路由分类", state.get("classify_ms", 0), f"{state.get('classifier_backend', '')} · {state.get('route')} {state.get('confidence', 0):.2f}"),
             ("retrieve", "混合检索", state.get("retrieve_ms", 0), state.get("retrieve_detail") or f"dense + BM25 · RRF · top {len(state.get('hits') or [])}"),

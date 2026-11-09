@@ -1,6 +1,11 @@
-from playwright.sync_api import sync_playwright
-import json, re, time, urllib.parse
+import json
+import re
+import time
+import urllib.parse
 from pathlib import Path
+
+from playwright.sync_api import Error as PlaywrightError
+from playwright.sync_api import sync_playwright
 
 OUT = Path('/run/media/myj/D/rag_m/data/naruto')
 OUT.mkdir(parents=True, exist_ok=True)
@@ -32,7 +37,7 @@ def main():
                     continue
                 rows.append({'title': t, 'url': url, 'text': text, 'chars': len(text)})
                 print('[ok]', t, len(text), flush=True)
-            except Exception as e:
+            except PlaywrightError as e:
                 print('[err]', t, type(e).__name__, str(e)[:60], flush=True)
             time.sleep(0.3)
         b.close()

@@ -34,6 +34,18 @@ class RouteDecision:
         }
 
 
+def override_decision(route: str) -> RouteDecision:
+    """显式指定路由时的合成决策，避免再调用分类器。"""
+    label: Label = ROUTE_TO_LABEL.get(route, "simple")
+    return RouteDecision(
+        label=label,
+        confidence=1.0,
+        backend="override",
+        latency_ms=0.0,
+        reason=f"手动指定路由：{route}",
+    )
+
+
 class Classifier(Protocol):
     name: str
 

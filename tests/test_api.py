@@ -4,6 +4,7 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from ragm.api import routes
 from ragm.api.main import create_app
 from ragm.config import get_settings
 
@@ -18,6 +19,22 @@ async def client(monkeypatch):
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
+
+
+@pytest.fixture
+async def unavailable_client(monkeypatch):
+    """模拟 RAG_BACKEND=langgraph 但 SearchService 初始化失败（不启动 lifespan）。"""
+    monkeypatch.setenv("CLASSIFIER_BACKEND", "rules")
+    monkeypatch.setenv("RAG_BACKEND", "langgraph")
+    monkeypatch.setenv("RAG_ALLOW_DEMO_FALLBACK", "false")
+    get_settings.cache_clear()
+    app = create_app()
+    app.state.search = None
+    app.state.kg = None
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as c:
+        yield c
+    get_settings.cache_clear()
 
 
 async def test_health(client: AsyncClient) -> None:
@@ -113,3 +130,39 @@ async def test_stream_sse(client: AsyncClient) -> None:
     assert "event: stage" in text
     assert "event: token" in text
     assert "event: done" in text
+
+
+async def test_query_returns_503_when_langgraph_search_unavailable(unavailable_client: AsyncClient) -> None:
+    resp = await unavailable_client.post("/api/query", json={"question": "Milvus 的 BM25 Function 是什么？"})
+    assert resp.status_code == 503
+    assert "search service not ready" in resp.json()["error"]["message"]
+
+    stream = await unavailable_client.post(
+        "/api/query/stream", json={"question": "Milvus 的 BM25 Function 是什么？"}
+    )
+    assert stream.status_code == 503
+
+
+async def test_langgraph_can_explicitly_fallback_to_demo(monkeypatch) -> None:
+    monkeypatch.setenv("CLASSIFIER_BACKEND", "rules")
+    monkeypatch.setenv("RAG_BACKEND", "langgraph")
+    monkeypatch.setenv("RAG_ALLOW_DEMO_FALLBACK", "true")
+    get_settings.cache_clear()
+    app = create_app()
+    app.state.search = None
+    app.state.kg = None
+    transport = ASGITransport(app=app)
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as c:
+            resp = await c.post("/api/query", json={"question": "Milvus 的 BM25 Function 是什么？"})
+    finally:
+        get_settings.cache_clear()
+    assert resp.status_code == 200
+    assert resp.json()["served_by"] == "demo"
+
+
+async def test_feedback_uses_absolute_log_dir(client: AsyncClient, monkeypatch, tmp_path) -> None:
+    monkeypatch.setattr(routes, "LOG_DIR", tmp_path / "logs")
+    resp = await client.post("/api/feedback", json={"query_id": "q_log", "rating": "up", "comment": "ok"})
+    assert resp.status_code == 200
+    assert (tmp_path / "logs" / "feedback.jsonl").exists()

@@ -7,6 +7,7 @@ export HF_ENDPOINT ?= https://hf-mirror.com
 export HF_HOME ?= $(DATA_ROOT)/hf_cache
 export UV_PROJECT_ENVIRONMENT ?= .venv
 UV ?= uv
+COV_ARGS ?= --cov=ragm --cov-report=term-missing
 COMPOSE ?= docker compose -f docker/compose.yaml
 
 .PHONY: help mount-data check-data venv install up up-graph up-all down ps health api web test test-api fmt lint clean
@@ -76,7 +77,7 @@ web: ## 启动前端 dev server（http://127.0.0.1:5173）
 	cd web && pnpm dev
 
 test:
-	$(UV) run pytest -q
+	$(UV) run pytest -q $(COV_ARGS)
 
 test-api: ## 只跑 API 契约测试
 	$(UV) run pytest tests/test_api.py -q
@@ -90,8 +91,8 @@ lint:
 clean:
 	find . -name __pycache__ -type d -prune -exec rm -rf {} +
 
-ci: ## 本地等价 CI（lint + 单测 + 前端构建）
-	scripts/ci.sh
+ci: ## 本地等价 CI（lint + 单测含覆盖率 + 前端构建）
+	COV_ARGS="$(COV_ARGS)" scripts/ci.sh
 
 gate: ## 确定性检索门禁（固定 fixture，不依赖 GPU/LLM）
 	.venv/bin/python scripts/eval_all.py --suite retrieval --fixture-only

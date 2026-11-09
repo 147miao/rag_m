@@ -39,7 +39,7 @@ def main() -> None:
         base_docs = list(dict.fromkeys(h["doc_id"] for h in base["hits"]))
         t0 = time.perf_counter()
         seeds = kg.link(q["question"], [h.get("title") or "" for h in base["hits"]])
-        edges, neighbors = kg.expand(seeds, limit=40)
+        _edges, neighbors = kg.expand(seeds, limit=40)
         titles = [n for n in neighbors if n not in seeds][:12]
         graph_chunks = svc.chunks_by_titles(titles, limit=8)
         graph_docs = list(dict.fromkeys(c["doc_id"] for c in graph_chunks))

@@ -178,6 +178,8 @@ export function RightPanel({
 }
 
 function EvidenceCard({ evidence, color, active, onClick }: { evidence: Evidence; color: string; active: boolean; onClick: () => void }) {
+  const snippet = cleanEvidence(evidence.snippet)
+  const phrase = evidence.highlight ? cleanEvidence(evidence.highlight) : ''
   return (
     <button
       type="button"
@@ -206,7 +208,7 @@ function EvidenceCard({ evidence, color, active, onClick }: { evidence: Evidence
       </div>
 
       <p className="mt-2 line-clamp-3 text-[11.5px] leading-relaxed text-ink-2">
-        {evidence.highlight ? highlight(cleanEvidence(evidence.snippet), evidence.highlight) : cleanEvidence(evidence.snippet)}
+        {highlight(snippet, phrase)}
       </p>
 
       <div className="mt-2 flex items-center gap-2">
@@ -220,8 +222,18 @@ function EvidenceCard({ evidence, color, active, onClick }: { evidence: Evidence
 }
 
 function highlight(text: string, phrase: string) {
-  const idx = text.indexOf(phrase)
-  if (idx < 0) return text
+  const target = cleanEvidence(phrase)
+  if (target) {
+    const idx = text.indexOf(target)
+    if (idx >= 0) return renderMarked(text, target, idx)
+    const fallback = firstSentence(text)
+    const fallbackIdx = fallback ? text.indexOf(fallback) : -1
+    if (fallbackIdx >= 0) return renderMarked(text, fallback, fallbackIdx)
+  }
+  return text
+}
+
+function renderMarked(text: string, phrase: string, idx: number) {
   return (
     <>
       {text.slice(0, idx)}
@@ -229,6 +241,11 @@ function highlight(text: string, phrase: string) {
       {text.slice(idx + phrase.length)}
     </>
   )
+}
+
+function firstSentence(text: string): string {
+  const first = (text.split(/[。！？!?\n]/)[0] ?? '').trim()
+  return first.length >= 4 ? first.slice(0, 80) : ''
 }
 
 function GraphPath({ nodes, edges, color }: { nodes: GraphNode[]; edges: GraphEdge[]; color: string }) {

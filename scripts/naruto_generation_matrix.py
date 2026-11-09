@@ -6,7 +6,10 @@ import re
 import time
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor
+from http.client import HTTPException
 from pathlib import Path
+
+import httpx
 
 from ragm.config import get_settings
 from ragm.rag.llm import LLMClient
@@ -62,10 +65,10 @@ def ask_json(prompt):
             fence = chr(96) * 3
             raw = re.sub(r'^' + fence + r'[a-zA-Z]*\n?', '', raw)
             raw = re.sub(r'\n?' + fence + r'$', '', raw).strip()
-            m = re.search(r'\{.*\}', raw, re.S)
+            m = re.search(r'\{.*\}', raw, re.DOTALL)
             if m:
                 return json.loads(m.group(0))
-        except Exception:
+        except (httpx.HTTPError, KeyError, TypeError, ValueError, RuntimeError):
             time.sleep(1)
     return {}
 
@@ -78,7 +81,7 @@ def query_api(q):
             req = urllib.request.Request(API, data=body, headers={'Content-Type': 'application/json'})
             with urllib.request.urlopen(req, timeout=240) as resp:
                 return json.load(resp)
-        except Exception as exc:
+        except (OSError, ValueError, HTTPException) as exc:
             last = exc
             time.sleep(2)
     raise last

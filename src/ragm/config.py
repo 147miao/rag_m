@@ -70,6 +70,8 @@ class Settings(BaseSettings):
 
     # ---- generation (langgraph) ----
     rag_backend: str = "langgraph"  # langgraph | demo
+    # langgraph 依赖不可用时是否允许显式回退 demo；默认 False，/api/query 返回 503
+    rag_allow_demo_fallback: bool = False
     rag_max_tokens: int = 1024
     rag_top_k: int = 8
     rag_multihop_k: int = 12

@@ -33,6 +33,30 @@ def test_kg_query_without_graph() -> None:
     assert out["ok"] is False
 
 
+class FakeKG:
+    def __init__(self) -> None:
+        self.names = ["Milvus", "Milvus Cloud"]
+        self.calls: list[dict] = []
+
+    def expand_hops(self, names: list[str], hops: int = 2, limit: int = 40):
+        self.calls.append({"names": names, "hops": hops, "limit": limit})
+        return [{"a": "Milvus", "b": "BM25", "qtype": "co_evidence"}], ["BM25"]
+
+
+def test_kg_query_honors_hops() -> None:
+    kg = FakeKG()
+    executor = ToolExecutor(search=None, kg=kg, settings=Settings())
+    out = executor.kg_query("Milvus", hops=2)
+    assert out["ok"] is True
+    assert set(kg.calls[0]["names"]) == {"Milvus", "Milvus Cloud"}
+    assert kg.calls[0]["hops"] == 2
+    assert kg.calls[0]["limit"] == 30
+    assert out["paths"][0]["b"] == "BM25"
+
+    executor.run("kg_query", {"entity": "Milvus", "hops": 1})
+    assert kg.calls[-1]["hops"] == 1
+
+
 def test_tracing_disabled_by_default() -> None:
     assert tracing.configure_tracing(Settings(langsmith_tracing=False, langsmith_api_key=None)) is False
     assert tracing.tracing_enabled() is False

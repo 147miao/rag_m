@@ -13,6 +13,7 @@ from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import StreamingResponse
 
 from .. import __version__
+from ..classifier.base import RouteDecision
 from ..config import get_settings
 from ..ops.status import collect_status
 from .examples import examples_for
@@ -37,6 +38,7 @@ from .schemas import (
 )
 
 router = APIRouter(prefix="/api", tags=["rag"])
+LOG_DIR = Path(__file__).resolve().parents[3] / "logs"
 
 
 def _service(request: Request):
@@ -47,9 +49,30 @@ def _classifier(request: Request):
     return request.app.state.classifier
 
 
+def _query_service(request: Request):
+    """langgraph 后端依赖不可用时明确 503，除非显式开启 demo 回退。"""
+    settings = get_settings()
+    search = getattr(request.app.state, "search", None)
+    if settings.rag_backend == "langgraph" and search is None and not settings.rag_allow_demo_fallback:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "query unavailable: search service not ready (embedding model / milvus). "
+                "Set RAG_ALLOW_DEMO_FALLBACK=true to allow demo answers."
+            ),
+        )
+    service = getattr(request.app.state, "service", None)
+    if service is None:
+        raise HTTPException(status_code=503, detail="query service not ready")
+    return service
+
+
+def _classify_decision(request: Request, question: str) -> RouteDecision:
+    return _classifier(request).classify(question)
+
+
 def _classify(request: Request, question: str) -> ClassifierInfo:
-    decision = _classifier(request).classify(question)
-    return ClassifierInfo(**decision.as_dict())
+    return ClassifierInfo(**_classify_decision(request, question).as_dict())
 
 
 # ---------- health ----------
@@ -180,13 +203,14 @@ async def route(req: RouteRequest, request: Request) -> RouteResponse:
 
 @router.post("/query", response_model=QueryResponse, summary="执行一次 RAG 查询")
 async def query(req: QueryRequest, request: Request) -> QueryResponse:
-    classifier_info = None
+    service = _query_service(request)
+    decision = None
     if req.route_override == "auto":
-        classifier_info = _classify(request, req.question)
-        req = req.model_copy(update={"route_override": classifier_info.route})
-    resp = await _service(request).query(req)
-    if classifier_info is not None:
-        resp.classifier = classifier_info
+        decision = _classify_decision(request, req.question)
+        req = req.model_copy(update={"route_override": decision.route})
+    resp = await service.query(req, decision=decision)
+    if decision is not None:
+        resp.classifier = ClassifierInfo(**decision.as_dict())
     return resp
 
 
@@ -196,9 +220,15 @@ def _sse(event: str, data: str) -> str:
 
 @router.post("/query/stream", summary="SSE 流式查询（stage → token → done）")
 async def query_stream(req: QueryRequest, request: Request) -> StreamingResponse:
+    service = _query_service(request)
+    decision = None
+    if req.route_override == "auto":
+        decision = _classify_decision(request, req.question)
+        req = req.model_copy(update={"route_override": decision.route})
+
     async def gen():
         try:
-            async for ev in _service(request).stream(req):
+            async for ev in service.stream(req, decision=decision):
                 if isinstance(ev, StageEvent):
                     yield _sse("stage", ev.model_dump_json(by_alias=True))
                 elif isinstance(ev, TokenEvent):
@@ -221,7 +251,7 @@ async def query_stream(req: QueryRequest, request: Request) -> StreamingResponse
 # ---------- feedback ----------
 @router.post("/feedback", response_model=FeedbackResponse, summary="答案反馈")
 async def feedback(req: FeedbackRequest, request: Request) -> FeedbackResponse:
-    log_dir = Path("logs")
+    log_dir = LOG_DIR
     log_dir.mkdir(parents=True, exist_ok=True)
     fid = "fb_" + uuid.uuid4().hex[:10]
     record = {

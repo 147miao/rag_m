@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 import type { Scenario } from '../lib/types'
 import { ROUTE_META } from '../lib/types'
@@ -65,6 +65,11 @@ export function AnswerCard({
   const meta = ROUTE_META[scenario.route]
   const showBody = phase === 'streaming' || phase === 'done'
   const [feedback, setFeedback] = useState<'up' | 'down' | null>(null)
+
+  // 切换答案后重置反馈状态，避免把上一条的「已反馈」带到新答案
+  useEffect(() => {
+    setFeedback(null)
+  }, [scenario.id])
 
   return (
     <article className="card overflow-hidden">

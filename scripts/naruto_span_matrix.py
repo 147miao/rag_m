@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import hashlib
 import json
-import time
 from pathlib import Path
 
 import numpy as np
@@ -70,7 +69,7 @@ def metrics(ranked, golds):
             idcg = sum(1 / np.log2(i + 2) for i in range(min(len(gs), k)))
             ndcgs.append(dcg / idcg if idcg else 0.0)
             mrrs.append(next((1 / (i + 1) for i, d in enumerate(top) if d in gs), 0.0))
-        out["recall@%d" % k] = round(float(np.mean(recalls)), 4)
+        out[f"recall@{k}"] = round(float(np.mean(recalls)), 4)
         if k == 10:
             out["ndcg@10"] = round(float(np.mean(ndcgs)), 4)
             out["mrr@10"] = round(float(np.mean(mrrs)), 4)
