@@ -16,6 +16,7 @@ from .. import __version__
 from ..classifier.base import RouteDecision
 from ..config import get_settings
 from ..ops.status import collect_status
+from ..rag.llm_router import build_llm
 from .examples import examples_for
 from .schemas import (
     ClassifierInfo,
@@ -107,6 +108,30 @@ async def _check_ollama(base_url: str, model: str, timeout: float = 2.0) -> Heal
         return HealthCheck(ok=False, detail=type(exc).__name__ + ": " + str(exc)[:120])
 
 
+def _provider_health(llm) -> HealthCheck:
+    """逐 provider 输出 ok/circuit_open；整体 ok 只看主 provider（状态里的第一个）。"""
+    try:
+        statuses = llm.provider_status() if llm is not None else {}
+    except Exception as exc:  # noqa: BLE001 - health 不能因为 provider 状态异常而 500
+        return HealthCheck(ok=False, detail=f"provider status error: {type(exc).__name__}: {str(exc)[:120]}")
+
+    items = []
+    for name, info in statuses.items():
+        state = str((info or {}).get("state", "closed"))
+        circuit_open = state == "open"
+        items.append(
+            {
+                "name": name,
+                "ok": not circuit_open,
+                "circuit_open": circuit_open,
+                "state": state,
+                "failures": int((info or {}).get("failures", 0)),
+            }
+        )
+    primary_ok = bool(items) and bool(items[0]["ok"])
+    return HealthCheck(ok=primary_ok, detail=json.dumps(items, ensure_ascii=False, separators=(",", ":")))
+
+
 @router.get("/health", response_model=HealthResponse, summary="健康检查")
 async def health(request: Request) -> HealthResponse:
     settings = get_settings()
@@ -127,6 +152,18 @@ async def health(request: Request) -> HealthResponse:
         checks["classifier"] = HealthCheck(ok=False, detail=type(exc).__name__)
     kg = getattr(request.app.state, "kg", None)
     checks["kg"] = HealthCheck(ok=kg is not None, detail=f"{len(kg.names)} entities" if kg is not None else "disabled")
+    llm = getattr(request.app.state, "llm", None)
+    if llm is None:
+        # 无 lifespan 的测试 / 早期请求：按当前 settings 懒构建一次。
+        try:
+            llm = build_llm(settings)
+            request.app.state.llm = llm
+        except Exception as exc:  # noqa: BLE001
+            checks["providers"] = HealthCheck(
+                ok=False, detail=f"provider init failed: {type(exc).__name__}: {str(exc)[:120]}"
+            )
+    if "providers" not in checks:
+        checks["providers"] = _provider_health(llm)
     checks["langsmith"] = HealthCheck(
         ok=True,
         detail=f"enabled · {settings.langsmith_project}" if settings.langsmith_tracing and settings.langsmith_api_key else "disabled",

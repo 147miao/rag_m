@@ -31,7 +31,7 @@ from ..embeddings.reranker import build_reranker
 from ..graph.kg import KGStore
 from ..observability.tracing import configure_tracing
 from ..rag.langgraph_service import LangGraphRagService
-from ..rag.llm import LLMClient
+from ..rag.llm_router import build_llm
 from ..rag.service import DemoRagService
 from ..store.search_service import SearchService
 from .jobs_routes import router as jobs_router
@@ -65,6 +65,9 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     app.state.search = None
     app.state.kg = None
     settings = get_settings()
+    llm = build_llm(settings)
+    app.state.llm = llm
+    logger.info("llm providers: %s", ", ".join(llm.provider_status()) or "none")
     configure_tracing(settings)
     try:
         app.state.search = SearchService(settings)
@@ -89,7 +92,6 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 logger.info("reranker ready: %s", settings.rerank_model)
             except Exception:
                 logger.warning("reranker unavailable", exc_info=True)
-        llm = LLMClient(settings.llm_base_url, settings.llm_model, settings.llm_api_key, settings.llm_temperature)
         executor = ToolExecutor(app.state.search, app.state.kg, settings)
         agent = AgentGraph(
             llm,
@@ -103,7 +105,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         app.state.service = LangGraphRagService(
             app.state.classifier, app.state.search, llm, settings, kg=app.state.kg, agent=agent, executor=executor, reranker=reranker
         )
-        logger.info("rag backend=langgraph | llm=%s | kg=%s | agent tools=%s", settings.llm_model, app.state.kg is not None, True)
+        logger.info(
+            "rag backend=langgraph | providers=%s | kg=%s | agent tools=%s",
+            ",".join(llm.provider_status()) or "none",
+            app.state.kg is not None,
+            True,
+        )
     elif settings.rag_backend == "langgraph":
         if settings.rag_allow_demo_fallback:
             logger.warning(
@@ -131,6 +138,7 @@ def create_app() -> FastAPI:
     app.state.classifier = build_classifier()
     app.state.search = None
     app.state.kg = None
+    app.state.llm = None
 
     app.add_middleware(
         CORSMiddleware,
