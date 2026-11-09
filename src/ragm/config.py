@@ -1,11 +1,31 @@
 """统一配置入口：所有路径与连接串集中在这里，禁止在业务代码里硬编码。"""
 from __future__ import annotations
 
+import json
 import os
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# v1.1 内置 LLM provider 链：opencode-go 主，ollama 备（可用 LLM_PROVIDERS JSON 覆盖）。
+DEFAULT_LLM_PROVIDERS: tuple[dict[str, Any], ...] = (
+    {
+        "name": "opencode-go",
+        "base_url": "http://127.0.0.1:8788/inference/go/v1",
+        "model": "deepseek-v4-flash",
+        "api_key_env": "OPENCODE_GO_API_KEY",
+        "first_token_timeout": 15,
+    },
+    {
+        "name": "ollama",
+        "base_url": "http://127.0.0.1:11434/v1",
+        "model": "gemma4:31b-cloud",
+        "api_key": "ollama",
+        "first_token_timeout": 20,
+    },
+)
 
 
 class Settings(BaseSettings):
@@ -36,6 +56,11 @@ class Settings(BaseSettings):
     llm_model: str = "gemma4:31b-cloud"
     llm_api_key: str = "ollama"
     llm_temperature: float = 0.0
+    # v1.1 LLM 降级：JSON 数组（格式见 plan.md 3.1）；空 = 内置 DEFAULT_LLM_PROVIDERS。
+    # api_key 不写入仓库，provider 通过 api_key_env 从环境变量读取。
+    llm_providers: str = ""
+    llm_chat_timeout: float = 60.0
+    llm_first_token_timeout: float = 15.0
 
     # ---- embeddings ----
     embed_model: str = "google/embeddinggemma-300m"
@@ -83,6 +108,24 @@ class Settings(BaseSettings):
     top_k_final: int = 8
     rrf_k: int = 60
 
+    # ---- multi-turn sessions (v1.1 W1) ----
+    # 空 = data_root/data/sessions.sqlite，由 session_store_path 解析。
+    session_db_path: str = ""
+    session_max_turns: int = 6
+    session_max_chars: int = 4000
+    session_rewrite_enabled: bool = True
+
+    # ---- MCP (v1.1 W2) ----
+    mcp_enabled: bool = False
+    mcp_sandbox_root: str = ""
+    mcp_confirm_ttl_s: int = 60
+
+    # ---- async ingest jobs (v1.1 W4) ----
+    # 空 = data_root/data/jobs.sqlite，由 jobs_store_path 解析。
+    jobs_db_path: str = ""
+    jobs_worker: bool = True
+    jobs_max_attempts: int = 3
+
     @property
     def raw_dir(self) -> Path:
         return self.data_root / "data" / "raw"
@@ -98,6 +141,31 @@ class Settings(BaseSettings):
     @property
     def models_dir(self) -> Path:
         return self.data_root / "models"
+
+    @property
+    def session_store_path(self) -> Path:
+        """会话 SQLite 实际路径；SESSION_DB_PATH 为空时落到 data_root/data/sessions.sqlite。"""
+        if self.session_db_path:
+            return Path(self.session_db_path)
+        return self.data_root / "data" / "sessions.sqlite"
+
+    @property
+    def jobs_store_path(self) -> Path:
+        """任务 SQLite 实际路径；JOBS_DB_PATH 为空时落到 data_root/data/jobs.sqlite。"""
+        if self.jobs_db_path:
+            return Path(self.jobs_db_path)
+        return self.data_root / "data" / "jobs.sqlite"
+
+    @property
+    def resolved_llm_providers(self) -> list[dict[str, Any]]:
+        """解析 LLM_PROVIDERS；空字符串返回内置 provider 链（opencode-go → ollama）。"""
+        raw = self.llm_providers.strip()
+        if not raw:
+            return [dict(item) for item in DEFAULT_LLM_PROVIDERS]
+        parsed = json.loads(raw)
+        if not isinstance(parsed, list):
+            raise TypeError("LLM_PROVIDERS 必须是 JSON 数组")
+        return [dict(item) for item in parsed]
 
     def ensure_dirs(self) -> None:
         """创建目录，并校验 DATA_ROOT 确实是挂载点（防止 D 盘未挂载时写进 tmpfs）。"""
