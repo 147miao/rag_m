@@ -11,7 +11,7 @@ from httpx import ASGITransport, AsyncClient
 from ragm.agent.code_tools import CODE_TOOL_SCHEMAS, CodeToolExecutor
 from ragm.api import code_routes
 from ragm.api.code_routes import router as code_router
-from ragm.code.service import CodeService, verify_code_citations
+from ragm.code.service import CodeService, extract_identifier_tokens, verify_code_citations
 
 # ---------- fake W1 契约实现 ----------
 
@@ -19,6 +19,7 @@ class FakeStore:
     def __init__(self) -> None:
         self.repos: dict[str, dict[str, Any]] = {}
         self.hits: list[dict[str, Any]] = []
+        self.hits_by_query: dict[str, list[dict[str, Any]]] | None = None
         self.symbols: list[dict[str, Any]] = []
         self.imports: dict[tuple[str, str], list[str]] = {}
         self.overviews: dict[str, dict[str, Any]] = {}
@@ -60,8 +61,9 @@ class FakeStore:
         self.search_calls.append(
             {"query": query, "k": k, "repo_id": repo_id, "path_prefix": path_prefix, "kind": kind}
         )
+        source = self.hits_by_query.get(query, self.hits) if self.hits_by_query is not None else self.hits
         results = []
-        for hit in self.hits:
+        for hit in source:
             if repo_id and hit.get("repo_id") != repo_id:
                 continue
             if path_prefix and not str(hit.get("path", "")).startswith(path_prefix):
@@ -112,18 +114,27 @@ class FakeIndexer:
 class FakeLLM:
     provider = "fake"
 
-    def __init__(self, text: str = "", error: Exception | None = None) -> None:
+    def __init__(
+        self, text: str = "", error: Exception | None = None, replies: list[str] | None = None
+    ) -> None:
         self.text = text
         self.error = error
+        self.replies = list(replies) if replies is not None else None
+        self.calls: list[list[dict[str, Any]]] = []
         self.messages: list[dict[str, Any]] | None = None
         self.max_tokens: int | None = None
 
     def chat(self, messages: list[dict[str, Any]], max_tokens: int = 1024, json_mode: bool = False) -> dict[str, Any]:
+        self.calls.append(messages)
         self.messages = messages
         self.max_tokens = max_tokens
         if self.error is not None:
             raise self.error
-        return {"text": self.text, "tokens_in": 1, "tokens_out": 1}
+        text = self.text
+        if self.replies:
+            index = min(len(self.calls) - 1, len(self.replies) - 1)
+            text = self.replies[index]
+        return {"text": text, "tokens_in": 1, "tokens_out": 1}
 
 
 # ---------- fixtures ----------
@@ -423,11 +434,12 @@ async def test_ask_refuses_without_hits(make_app, store, repo_id) -> None:
     assert llm.messages is None
 
 
-async def test_ask_refuses_when_citation_invalid(make_app, store, repo_id) -> None:
+async def test_ask_falls_back_when_citation_invalid(make_app, store, repo_id) -> None:
     store.hits = [make_hit(repo_id, "src/missing.py", "foo")]
+    llm = FakeLLM("答案见 [1]")
     service = CodeService(
         store,
-        llm=FakeLLM("答案见 [1]"),
+        llm=llm,
         file_exists=lambda _path: False,
         read_lines=lambda _path: 100,
     )
@@ -436,8 +448,13 @@ async def test_ask_refuses_when_citation_invalid(make_app, store, repo_id) -> No
             "/api/code/ask", json={"question": "foo?", "repo_id": repo_id}
         )
     assert missing_file.status_code == 200
-    assert missing_file.json()["citations"] == []
-    assert missing_file.json()["refusal"] is not None
+    body = missing_file.json()
+    assert body["citations"] != []
+    assert body["citations"][0]["path"] == "src/missing.py"
+    assert body["refusal"] is None
+    assert "抽取式" in body["answer"]["lead"]
+    assert "src/missing.py:2-5" in body["answer"]["body"]
+    assert len(llm.calls) == 2
 
     contexts = [
         {
@@ -495,16 +512,63 @@ async def test_verify_code_citations_unit() -> None:
     assert len(citations) == 1 and invalid == [] and check == "1/1 通过"
 
 
-async def test_ask_refuses_on_out_of_range_citation(make_app, store, repo_id) -> None:
+async def test_ask_retries_after_refusal(make_app, store, repo_id, tmp_path) -> None:
+    write_lines(tmp_path / "src/a.py", 10)
     store.hits = [make_hit(repo_id)]
-    llm = FakeLLM("只看到 [2]")
+    llm = FakeLLM(
+        replies=[
+            "无法基于现有代码回答。",
+            "结论：foo 负责处理请求 [1]\n\n实现位于 src/a.py。",
+        ]
+    )
+    async with client_for(make_app(llm=llm)) as client:
+        resp = await client.post("/api/code/ask", json={"question": "foo 做什么?", "repo_id": repo_id})
+    assert resp.status_code == 200
+    body = resp.json()
+    assert body["refusal"] is None
+    assert [item["n"] for item in body["citations"]] == [1]
+    assert "foo 负责处理请求" in body["answer"]["lead"]
+    assert len(llm.calls) == 2
+    retry_system = llm.calls[1][0]["content"]
+    assert "上下文包含相关代码" in retry_system
+    assert "不要整体拒答" in retry_system
+
+
+async def test_ask_always_refusal_returns_extractive_fallback(make_app, store, repo_id) -> None:
+    store.hits = [make_hit(repo_id)]
+    llm = FakeLLM(replies=["无法基于现有代码回答。", "仍然无法回答。"])
     async with client_for(make_app(llm=llm)) as client:
         resp = await client.post("/api/code/ask", json={"question": "foo?", "repo_id": repo_id})
     assert resp.status_code == 200
     body = resp.json()
-    assert body["refusal"] is not None
-    assert body["citations"] == []
-    assert "引用校验" in body["refusal"]["reason"]
+    assert body["refusal"] is None
+    assert len(llm.calls) == 2
+    assert body["citations"] != []
+    assert body["citations"][0]["path"] == "src/a.py"
+    assert "抽取式" in body["answer"]["lead"]
+    assert "src/a.py:2-5" in body["answer"]["body"]
+
+
+async def test_ask_query_expansion_merges_and_dedups(make_app, store, repo_id, tmp_path) -> None:
+    for name in ("a", "b", "c"):
+        write_lines(tmp_path / f"src/{name}.py", 10)
+    hit_a = make_hit(repo_id, "src/a.py", "foo")
+    hit_b = make_hit(repo_id, "src/b.py", "bar")
+    hit_c = make_hit(repo_id, "src/c.py", "baz")
+    question = "FallbackLLM build_llm 怎么用"
+    store.hits_by_query = {question: [hit_a, hit_b], "FallbackLLM build_llm": [hit_b, hit_c]}
+    llm = FakeLLM("结论 [1]")
+    async with client_for(make_app(llm=llm)) as client:
+        resp = await client.post("/api/code/ask", json={"question": question, "repo_id": repo_id})
+    assert resp.status_code == 200
+    assert [call["query"] for call in store.search_calls[-2:]] == [question, "FallbackLLM build_llm"]
+    prompts = [call[1]["content"] for call in llm.calls]
+    user = prompts[0]
+    assert user.count("[1] src/b.py:2-5") == 1
+    assert "[2] src/a.py:2-5" in user
+    assert "[3] src/c.py:2-5" in user
+    assert resp.json()["citations"][0]["path"] == "src/b.py"
+    assert extract_identifier_tokens(question) == ["FallbackLLM", "build_llm"]
 
 
 async def test_ask_refuses_on_llm_error(make_app, store, repo_id) -> None:
