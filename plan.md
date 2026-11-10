@@ -12,7 +12,7 @@
 | 会话存储 | SQLite（`data/sessions.sqlite`），WAL + busy_timeout |
 | 会话处理 | 指代消解 + 子问题拆解；历史按 6 轮/4000 字截断 |
 | MCP | 自写 Python MCP Server（`list_dir`/`read_file`/`write_note`）；`write_note` 需确认；stdio 子进程 |
-| LLM | **主：opencode-go `deepseek-v4-flash`（`http://127.0.0.1:8788/inference/go/v1`，key 从 `OPENCODE_GO_API_KEY`）；备：Ollama `gemma4:31b-cloud`**；首 token 超时 15s/20s 可配；仅首 token 前切换 |
+| LLM | **主：opencode-go `deepseek-v4.1-flash`（`http://127.0.0.1:8788/inference/go/v1`，key 从 `OPENCODE_GO_API_KEY`）；备：Ollama `gemma4:31b-cloud`**；首 token 超时 15s/20s 可配；仅首 token 前切换 |
 | 队列 | SQLite 任务表 + **单 worker 线程 tick()**（不用 BackgroundTasks，避免双触发） |
 
 ## 0.2 并行方式（审核修正）
@@ -74,7 +74,7 @@
 ## 3.1 LLM provider 配置
 ```bash
 LLM_PROVIDERS='[
- {"name":"opencode-go","base_url":"http://127.0.0.1:8788/inference/go/v1","model":"deepseek-v4-flash","api_key_env":"OPENCODE_GO_API_KEY","first_token_timeout":15},
+ {"name":"opencode-go","base_url":"http://127.0.0.1:8788/inference/go/v1","model":"deepseek-v4.1-flash","api_key_env":"OPENCODE_GO_API_KEY","extra_headers":{"x-opencode-session":"$UUID"},"first_token_timeout":15},
  {"name":"ollama","base_url":"http://127.0.0.1:11434/v1","model":"gemma4:31b-cloud","api_key":"ollama","first_token_timeout":20}
 ]'
 ```

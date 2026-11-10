@@ -40,7 +40,7 @@ agentic 路由则走 `plan → tools → plan … → synthesize → verify` 的
 
 | 能力 | 说明 |
 |---|---|
-| 查询路由 | 3 类分类器（规则 / LLM 提示词 / LoRA），默认 LoRA，36ms/条，失败自动降级规则 |
+| 查询路由 | 3 类分类器（规则 / LLM 提示词 / LoRA），默认 `rules`（本机 `.env` 用 LoRA，36ms/条），失败自动降级规则 |
 | 混合检索 | dense（embeddinggemma-300m）+ BM25（Milvus 3.0 Function）+ RRF 融合 |
 | 重排 | bge-reranker-base，hybrid top-20 → 重排 → top-k |
 | Small-to-Big | 小块检索（200 字）+ 大块上下文（父块/整篇），长文档覆盖率 0.70 → 0.99 |
@@ -52,7 +52,7 @@ agentic 路由则走 `plan → tools → plan … → synthesize → verify` 的
 | 实验工具 | 分类器训练/评测、embedding/reranker/chunk 横向评测、并行基准编排 |
 | 多轮会话 | SQLite 会话历史 + 指代消解 + 子问题拆解 + 多查询检索（/api/sessions） |
 | MCP 工具 | 自写 MCP Server（list_dir/read_file/write_note），敏感工具 requires_confirmation + token |
-| LLM 降级 | opencode-go deepseek-v4-flash 主 → Ollama gemma4:31b-cloud 备；首 token 超时 + 熔断 |
+| LLM 降级 | opencode-go `deepseek-v4.1-flash` 主 → Ollama gemma4:31b-cloud 备；首 token 超时 + 熔断；relay 会话头 `x-opencode-session` 由 `extra_headers` 的 `$UUID` 每次请求生成 |
 | 异步入库 | SQLite 任务表 + 单 worker + 重试/恢复（/api/ingest、/api/jobs） |
 
 ## 三、快速开始
@@ -143,7 +143,7 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 
 ## 三·七、CI 与容器
 
-- `make ci`：ruff（src/tests）+ pytest（23 条）+ 前端 build，本地等价 CI；
+- `make ci`：ruff（src/tests/scripts）+ pytest（**139 passed + 2 skipped**；设 `RAGM_LLM_E2E=1` 且配置 primary key 时 141 passed）+ 前端 build，本地等价 CI；
 - GitHub Actions：`.github/workflows/ci.yml`（lint + tests + 检索门禁 + web build）；
 - 容器：`docker/Dockerfile.api` + compose `app` profile（含 GPU 直通、`/api/readyz` 健康检查）。
   数据/模型需放 `$HOME/ragm_data` 并挂载到容器 `/data`；镜像未在本机实际构建（torch 体积大）。
@@ -164,24 +164,27 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 | `KG_LABEL` / `KG_RELATION` | `Entity` / `CO_EVIDENCE` | 图谱节点标签/关系名（火影语料用 `NarutoEntity` / `MENTIONS`） |
 | `LLM_BASE_URL` / `LLM_MODEL` / `LLM_API_KEY` | Ollama | 任意 OpenAI 兼容服务；DeepSeek 示例见 `.env.example` |
 | `EMBED_MODEL` / `EMBED_DIM` / `EMBED_MODEL_PATH` | `google/embeddinggemma-300m` / 768 | 检索 embedding 模型 |
-| `RERANK_MODEL` / `RERANK_ENABLED` / `RERANK_MODEL_PATH` | `bge-reranker-base` / true | 重排模型 |
-| `CLASSIFIER_BACKEND` | `lora` | `rules` / `prompt` / `lora` |
+| `RERANK_MODEL` / `RERANK_ENABLED` / `RERANK_MODEL_PATH` | `bge-reranker-v2-m3` / false | 重排模型（`RERANK_ENABLED=false` 时跳过重排） |
+| `CLASSIFIER_BACKEND` | `rules` | `rules` / `prompt` / `lora`；本机 `.env` 设为 `lora` |
 | `CLASSIFIER_RUN_DIR` | — | LoRA adapter 目录（如 `.../models/classifier/s1_06b_plain`） |
 | `RAG_BACKEND` | `langgraph` | `langgraph`（真实链路）/ `demo`（演示数据） |
 | `AGENT_MAX_ITERATIONS` | 2 | agentic 工具循环最大轮数 |
 | `WEB_SEARCH_URL` | `http://127.0.0.1:8080/search` | SearXNG 地址（web_search 兜底） |
 | `LANGSMITH_TRACING` / `LANGSMITH_API_KEY` / `LANGSMITH_PROJECT` | 关闭 | 填入 key 后自动上报 LangSmith |
-| `SESSION_DB_PATH` / `SESSION_MAX_TURNS` / `SESSION_MAX_CHARS` | 空 / 6 / 4000 | 会话 SQLite 路径、历史轮数、字符预算 |
+| `SESSION_DB_PATH` / `SESSION_MAX_TURNS` / `SESSION_MAX_CHARS` / `SESSION_REWRITE_ENABLED` | 空 / 6 / 4000 / true | 会话 SQLite 路径、历史轮数、字符预算、指代改写 + 子问题拆解开关 |
 | `MCP_ENABLED` / `MCP_SANDBOX_ROOT` / `MCP_CONFIRM_TTL_S` / `MCP_CONFIRM_SECRET` | false / 空 / 60 / 空 | MCP 开关、沙箱根、确认 token TTL 与 HMAC secret（空 = 进程随机） |
 | `LLM_PROVIDERS` / `LLM_CHAT_TIMEOUT` / `LLM_FIRST_TOKEN_TIMEOUT` | 空（内置链）/ 60 / 15 | provider 链单行 JSON；整请求/首 token 超时；`/api/health` 的 `providers` 检查逐个返回各 provider 的 `state` / `failures` |
 | `OPENCODE_GO_API_KEY` | 空 | opencode-go 主 provider 的 key（只从环境变量读） |
 | `JOBS_DB_PATH` / `JOBS_WORKER` / `JOBS_MAX_ATTEMPTS` | 空 / true / 4 | 任务表路径、worker 开关、总尝试次数（4 = 1 次初始 + 3 次重试） |
 
-`LLM_PROVIDERS` 单行 JSON 示例（键：`name` / `base_url` / `model` / `api_key_env` / `api_key` / `first_token_timeout`）：
+`LLM_PROVIDERS` 单行 JSON 示例（键：`name` / `base_url` / `model` / `api_key_env` / `api_key` / `first_token_timeout` / `extra_headers`）：
 
 ```bash
-LLM_PROVIDERS='[{"name":"opencode-go","base_url":"http://127.0.0.1:8788/inference/go/v1","model":"deepseek-v4-flash","api_key_env":"OPENCODE_GO_API_KEY","first_token_timeout":15},{"name":"ollama","base_url":"http://127.0.0.1:11434/v1","model":"gemma4:31b-cloud","api_key":"ollama","first_token_timeout":20}]'
+LLM_PROVIDERS='[{"name":"opencode-go","base_url":"http://127.0.0.1:8788/inference/go/v1","model":"deepseek-v4.1-flash","api_key_env":"OPENCODE_GO_API_KEY","extra_headers":{"x-opencode-session":"$UUID"},"first_token_timeout":15},{"name":"ollama","base_url":"http://127.0.0.1:11434/v1","model":"gemma4:31b-cloud","api_key":"ollama","first_token_timeout":20}]'
 ```
+
+`extra_headers` 是「请求头 → 值」对象；值里的 `$UUID` 每次请求替换为新 uuid4。
+opencode-go relay 要求每次请求带 `x-opencode-session`（缺失返回 400），内置链已默认携带。
 
 ## 五、API
 
@@ -223,7 +226,8 @@ curl -N -X POST localhost:8000/api/query/stream -H "Content-Type: application/js
 
 响应主要字段：`answer{lead, body}`、`citations[]`、`evidence[]`（含 `snippet` 与 `full_text`）、
 `trace[]`（路由/检索/重排/生成/引用校验耗时）、`graph`（多跳实体路径）、`tools`（agentic 工具调用）、
-`stats`（延迟、token、引用校验）、`served_by`（`langgraph` / `demo`）。
+`stats`（延迟、token、引用校验）、`served_by`（`langgraph` / `demo`）、
+`provider`（本次实际服务的 LLM provider 名，如 `opencode-go` / `ollama`；demo 链路或无 provider 时为 `null`）。
 
 ## 六、数据与索引
 

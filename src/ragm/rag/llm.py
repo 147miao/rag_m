@@ -1,12 +1,16 @@
-"""OpenAI 兼容的 LLM 客户端（Ollama / DeepSeek 均可）。"""
+"""OpenAI 兼容的 LLM 客户端（Ollama / DeepSeek / opencode-go relay 均可）。"""
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator
+import uuid
+from collections.abc import Iterator, Mapping
 
 import httpx
 
 from ..observability.tracing import traceable
+
+# extra_headers 值里的占位符：每次请求替换为新 uuid4（opencode-go 要求 x-opencode-session）。
+UUID_PLACEHOLDER = "$UUID"
 
 
 class LLMError(RuntimeError):
@@ -14,12 +18,30 @@ class LLMError(RuntimeError):
 
 
 class LLMClient:
-    def __init__(self, base_url: str, model: str, api_key: str = "ollama", temperature: float = 0.0, timeout: float = 120.0) -> None:
+    def __init__(
+        self,
+        base_url: str,
+        model: str,
+        api_key: str = "ollama",
+        temperature: float = 0.0,
+        timeout: float = 120.0,
+        extra_headers: Mapping[str, str] | None = None,
+    ) -> None:
         self.base_url = base_url.rstrip("/")
         self.model = model
         self.api_key = api_key
         self.temperature = temperature
         self.timeout = timeout
+        self.extra_headers = {str(key): str(value) for key, value in (extra_headers or {}).items()}
+
+    def _headers(self) -> dict[str, str]:
+        """每次请求重新构造头：extra_headers 中的 $UUID 换成新的 uuid4（会话路由用）。"""
+        headers = {"Authorization": f"Bearer {self.api_key}"}
+        for key, value in self.extra_headers.items():
+            if UUID_PLACEHOLDER in value:
+                value = value.replace(UUID_PLACEHOLDER, str(uuid.uuid4()))
+            headers[key] = value
+        return headers
 
     def _client(self) -> httpx.Client:
         local = "127.0.0.1" in self.base_url or "localhost" in self.base_url
@@ -42,7 +64,7 @@ class LLMClient:
         with self._client() as client:
             resp = client.post(
                 f"{self.base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {self.api_key}"},
+                headers=self._headers(),
                 json=self._payload(messages, max_tokens, False, json_mode),
             )
             if resp.status_code >= 400:
@@ -69,7 +91,7 @@ class LLMClient:
         with self._client() as client:
             resp = client.post(
                 f"{self.base_url}/chat/completions",
-                headers={"Authorization": f"Bearer {self.api_key}"},
+                headers=self._headers(),
                 json=body,
             )
             if resp.status_code >= 400:
@@ -88,7 +110,7 @@ class LLMClient:
         with self._client() as client, client.stream(
             "POST",
             f"{self.base_url}/chat/completions",
-            headers={"Authorization": f"Bearer {self.api_key}"},
+            headers=self._headers(),
             json=self._payload(messages, max_tokens, True, False),
         ) as resp:
             if resp.status_code >= 400:

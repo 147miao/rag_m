@@ -10,12 +10,15 @@ from typing import Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # v1.1 内置 LLM provider 链：opencode-go 主，ollama 备（可用 LLM_PROVIDERS JSON 覆盖）。
+# model 必须是 relay `GET {base_url}/models` 实际返回的 id（本机：deepseek-v4.1-flash），否则 404 后降级。
 DEFAULT_LLM_PROVIDERS: tuple[dict[str, Any], ...] = (
     {
         "name": "opencode-go",
         "base_url": "http://127.0.0.1:8788/inference/go/v1",
-        "model": "deepseek-v4-flash",
+        "model": "deepseek-v4.1-flash",
         "api_key_env": "OPENCODE_GO_API_KEY",
+        # relay 要求每次请求带会话头；$UUID 由 LLMClient 每次请求替换为新的 uuid4。
+        "extra_headers": {"x-opencode-session": "$UUID"},
         "first_token_timeout": 15,
     },
     {
