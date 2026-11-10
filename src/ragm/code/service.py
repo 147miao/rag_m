@@ -17,6 +17,12 @@ from typing import Any, Protocol
 
 from ..rag.citations import parse_citations
 from ..rag.graph import parse_structured_answer
+from .ask_support import (
+    build_extractive_fallback,
+    extract_identifier_tokens,
+    looks_like_refusal,
+    merge_search_hits,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +35,7 @@ MAX_SNIPPET_CHARS = 1600
 ASK_MAX_TOKENS = 1024
 PROVIDER_UNKNOWN = ""
 
+
 IMPACT_NOTE = "文件级反向 import（启发式，非精确调用链）"
 REFUSAL_TITLE = "无法基于现有代码回答"
 REFUSAL_SUGGESTION = "请补充更具体的符号名、文件路径或问题范围后重试。"
@@ -39,6 +46,13 @@ CODE_ANSWER_SYSTEM_PROMPT = (
     "如果上下文不足以回答，直接说明“无法基于现有代码回答”，不要猜测。\n"
     "输出格式：第一行是一句话结论；空一行后给出 2-6 条展开说明。\n"
     "保留代码标识符与路径原文，不要改写。"
+)
+
+# 第一次输出拒答/无引用时的重试提示：不允许整体拒答，信息不完整也要给出可确定部分。
+RETRY_SYSTEM_PROMPT = (
+    CODE_ANSWER_SYSTEM_PROMPT
+    + "\n\n补充要求：上下文包含相关代码，必须基于可见代码回答；"
+    "信息不完整就说明能确定的部分，不要整体拒答。必须给出至少一个 [n] 引用。"
 )
 
 
@@ -393,6 +407,18 @@ class CodeService:
         )
         return [_normalize_hit(item, repo_id) for item in (raw_hits or []) if isinstance(item, dict)]
 
+    def _search_with_expansion(
+        self, question: str, k: int, repo_id: str | None = None
+    ) -> list[dict[str, Any]]:
+        """原问题 + ASCII 标识符词元各检索一次，按 chunk_id 去重合并后取 top k。"""
+        primary = self.search_code(question, k=k, repo_id=repo_id)
+        token_query = " ".join(extract_identifier_tokens(question))
+        if not token_query:
+            return primary
+        # 即使词元串与原文相同也按契约各检索一次（结果会按 chunk_id 去重）。
+        expanded = self.search_code(token_query, k=k, repo_id=repo_id)
+        return merge_search_hits([primary, expanded], k)
+
     def get_symbol(
         self, repo_id: str, qualname: str, path: str | None = None
     ) -> dict[str, Any] | None:
@@ -447,7 +473,11 @@ class CodeService:
         *,
         llm: Any | None = None,
     ) -> dict[str, Any]:
-        """基于代码检索上下文回答；无证据 / 引用不可验证时返回拒答。"""
+        """基于代码检索上下文回答。
+
+        流程：问题/标识符双查询合并 → 首次生成 → 拒答或无有效引用时用强化提示重试
+        → 仍无有效引用则返回 top 2 上下文的确定性抽取式兜底；完全无命中才拒答。
+        """
         question = _to_text(question).strip()
         if not question:
             raise CodeValidationError("question must not be empty")
@@ -462,7 +492,7 @@ class CodeService:
         if llm is None or not hasattr(llm, "chat"):
             raise CodeUnavailableError("code ask requires an LLM with chat()")
 
-        hits = self.search_code(question, k=k, repo_id=repo_id)
+        hits = self._search_with_expansion(question, k, repo_id)
         provider = self._provider_name(llm)
         if not hits:
             return self._refusal("未检索到相关代码片段", provider)
@@ -471,23 +501,63 @@ class CodeService:
         if not contexts:
             return self._refusal("检索结果缺少可用路径与行号", provider)
 
-        messages = [
-            {"role": "system", "content": CODE_ANSWER_SYSTEM_PROMPT},
+        messages = self._ask_messages(question, contexts)
+        text, error = self._chat(llm, messages)
+        provider = self._provider_name(llm)
+        if error is not None:
+            logger.warning("code ask llm failed: %s", error)
+            return self._refusal(f"LLM 调用失败（{error}）", provider)
+
+        answer = self._answer_from_text(text, contexts, provider, require_non_refusal=True)
+        if answer is not None:
+            return answer
+
+        # 第一次拒答/无引用：用更强的提示重试一次；仍无引用则走确定性抽取式兜底。
+        logger.info("code ask retry after refusal or missing citations")
+        retry_text, retry_error = self._chat(llm, self._ask_messages(question, contexts, retry=True))
+        provider = self._provider_name(llm)
+        if retry_error is None:
+            answer = self._answer_from_text(retry_text, contexts, provider, require_non_refusal=False)
+            if answer is not None:
+                return answer
+        else:
+            logger.warning("code ask retry failed: %s", retry_error)
+        fallback = build_extractive_fallback(contexts, provider)
+        if fallback is not None:
+            return fallback
+        return self._refusal("检索结果缺少可用路径与行号", provider)
+
+    # ---- ask helpers ----
+    def _ask_messages(
+        self, question: str, contexts: Sequence[dict[str, Any]], *, retry: bool = False
+    ) -> list[dict[str, str]]:
+        system_prompt = RETRY_SYSTEM_PROMPT if retry else CODE_ANSWER_SYSTEM_PROMPT
+        return [
+            {"role": "system", "content": system_prompt},
             {"role": "user", "content": self._build_prompt(question, contexts)},
         ]
+
+    def _chat(self, llm: Any, messages: list[dict[str, str]]) -> tuple[str, str | None]:
         try:
             raw = llm.chat(messages, max_tokens=ASK_MAX_TOKENS)
         except Exception as exc:
-            logger.warning("code ask llm failed: %s", type(exc).__name__, exc_info=True)
-            return self._refusal(f"LLM 调用失败（{type(exc).__name__}）", provider)
-
+            logger.debug("code ask chat error", exc_info=True)
+            return "", type(exc).__name__
         text = _to_text(raw.get("text")) if isinstance(raw, dict) else _to_text(raw)
-        if not text.strip():
-            return self._refusal("LLM 未返回内容", provider)
+        return text, None
 
-        # 调用后再取一次：FallbackLLM.last_provider 在成功调用后才更新。
-        provider = self._provider_name(llm)
-        lead, body = parse_structured_answer(text)
+    def _answer_from_text(
+        self,
+        text: str,
+        contexts: Sequence[dict[str, Any]],
+        provider: str,
+        *,
+        require_non_refusal: bool,
+    ) -> dict[str, Any] | None:
+        if not text.strip():
+            return None
+        if require_non_refusal and looks_like_refusal(text):
+            return None
         citations, invalid, check = verify_code_citations(
             text,
             contexts,
@@ -497,11 +567,8 @@ class CodeService:
         if invalid:
             logger.info("code ask dropped invalid citations: %s (%s)", invalid, check)
         if not citations:
-            reason = "回答未包含可验证的代码引用"
-            if invalid:
-                reason = f"引用校验未通过（{check}）"
-            return self._refusal(reason, provider)
-
+            return None
+        lead, body = parse_structured_answer(text)
         return {
             "answer": {"lead": lead or "已基于代码上下文生成回答", "body": body},
             "citations": citations,
@@ -509,7 +576,6 @@ class CodeService:
             "refusal": None,
         }
 
-    # ---- ask helpers ----
     def _provider_name(self, llm: Any) -> str:
         if self.provider_getter is not None:
             try:
@@ -584,6 +650,7 @@ class CodeService:
                     "end_line": end_line,
                     "qualname": qualname,
                     "kind": kind,
+                    "text": text,
                     "block": block,
                 }
             )
