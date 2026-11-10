@@ -697,21 +697,26 @@ def test_agent_tool_schemas() -> None:
         assert schema["function"]["parameters"]["type"] == "object"
         assert "required" in schema["function"]["parameters"]
 
-@pytest.mark.anyio
-async def test_code_disabled_returns_503(monkeypatch):
-    """CODE_ENABLED=false 时不应装配 code 服务，路由返回 503。"""
-    from httpx import ASGITransport, AsyncClient
+def test_code_disabled_returns_503(monkeypatch):
+    """CODE_ENABLED=false 时 lifespan 不装配 code 服务，路由返回 503（用 TestClient 触发 lifespan）。"""
+    from fastapi.testclient import TestClient
 
-    from ragm.api.main import create_app
+    from ragm.api import main
     from ragm.config import get_settings
 
     monkeypatch.setenv("CODE_ENABLED", "false")
     monkeypatch.setenv("CLASSIFIER_BACKEND", "rules")
     monkeypatch.setenv("RAG_BACKEND", "demo")
+
+    def _no_search(*args, **kwargs):
+        raise RuntimeError("no milvus in test")
+
+    monkeypatch.setattr(main, "SearchService", _no_search)
     get_settings.cache_clear()
-    app = create_app()
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.get("/api/code/repos")
+    app = main.create_app()
+    with TestClient(app) as client:
+        assert get_settings().code_enabled is False
+        assert app.state.code_service is None
+        resp = client.get("/api/code/repos")
         assert resp.status_code == 503
     get_settings.cache_clear()
