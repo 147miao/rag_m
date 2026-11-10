@@ -25,11 +25,18 @@ logger = logging.getLogger(__name__)
 
 
 class CodeIndexer:
-    """面向单个 root 的代码索引器；allowed_roots 用于阻止任意目录读取。"""
+    """面向单个 root 的代码索引器；allowed_roots 用于阻止任意目录读取。
+
+    allowed_roots=None（省略）使用 [home]；显式 [] 表示全部拒绝，与 API 路由对
+    CODE_ALLOWED_ROOTS=[] 的语义一致。
+    """
 
     def __init__(self, db_path: str | Path, allowed_roots: list[str | Path] | None = None) -> None:
         self.db_path = Path(db_path)
-        self.allowed_roots = [Path(item) for item in (allowed_roots or [Path.home()])]
+        if allowed_roots is None:
+            self.allowed_roots = [Path.home()]
+        else:
+            self.allowed_roots = [Path(item) for item in allowed_roots]
         self.store = CodeStore(self.db_path)
 
     def index(self, root: str, name: str, reindex: bool = False) -> dict[str, Any]:

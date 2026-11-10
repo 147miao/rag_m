@@ -203,18 +203,20 @@ def _overview_metric(raw: dict[str, Any], keys: Sequence[str], default: int = 0)
     return default
 
 
-def _top_paths(value: Any) -> list[str]:
+def _top_paths(value: Any) -> list[dict[str, Any]]:
     if not isinstance(value, (list, tuple)):
         return []
-    paths: list[str] = []
+    paths: list[dict[str, Any]] = []
     for item in value:
         if isinstance(item, dict):
             text = _to_text(item.get("path") or item.get("name"))
+            symbols = _to_int(item.get("symbols") or item.get("symbol_count") or item.get("count"))
         else:
             text = _to_text(item)
+            symbols = 0
         if text:
-            paths.append(text)
-    return paths[:20]
+            paths.append({"path": text, "symbols": symbols})
+    return paths[:10]
 
 
 def _kind_counts(value: Any) -> dict[str, int]:

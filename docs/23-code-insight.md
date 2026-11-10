@@ -9,7 +9,7 @@
 
 ## 快速开始
 ```bash
-# 索引一个仓库（默认 data/code_index.sqlite）
+# 索引一个仓库（默认 $DATA_ROOT/data/code_index.sqlite，与 API 共用；CODE_DB_PATH 可覆盖）
 python scripts/index_code.py --root /path/to/repo --name myrepo --reindex
 
 # 服务
@@ -33,9 +33,33 @@ curl -s -X POST localhost:8000/api/code/ask -H "Content-Type: application/json" 
 | `api/code_routes.py` | `/api/code/*` 端点 |
 | `agent/code_tools.py` | search_code/get_symbol/impact_analysis/repo_overview 工具定义 |
 
+## Agent 工具（P1-2）
+- `build_tool_schemas(include_code=False)` 默认保持原 3 个工具；`True` 追加 `search_code/get_symbol/impact_analysis/repo_overview`（共 7 个）；
+- `ToolExecutor(code_executor=...)` 对 4 个代码工具优先转发到 `CodeToolExecutor.execute`；
+- main 在 `CODE_ENABLED=true` 且 code service 可用时把 7 个 schema 传给 `AgentGraph(tool_schemas=...)`；关闭时行为与旧版一致。
+
+## allowed_roots 默认与空列表语义（P2-7）
+- CLI / `CodeIndexer`：省略 `--allow-root` / `allowed_roots=None` = `[当前用户 home]`；显式 `[]` = 全部拒绝；
+- API：`CODE_ALLOWED_ROOTS` 默认 `[home]`；显式 `[]` = 全部拒绝；`CODE_ENABLED=false` 时 `/api/code/*` 返回 503；
+- 索引器与 API 路由对“空列表 = 全禁”的语义一致，CLI 默认 home 只是省略时的默认值。
+
+## E2E（P1-3）
+```bash
+# 1) 自举索引（默认与 API 共用 $DATA_ROOT/data/code_index.sqlite）
+python scripts/index_code.py --root . --name rag_m
+
+# 2) 启动 API（CODE_ENABLED=true；真实 LLM 走现有 provider 链）
+# 3) 调 /api/code/ask 跑 tests/code_e2e_cases.json，并输出报告
+python scripts/code_e2e.py --base-url http://127.0.0.1:8000 --repo-name rag_m
+```
+最近一次结果（2026-11-10，真实 API + opencode-go）：
+- **10 题，refusal_count=0、citation_valid_rate=1.0、expected_path_hit_rate=1.0、p50≈7.62s**；
+- 输出：`reports/code_e2e.md`（人读）与 `reports/code_e2e.json`（机器可读，含每题 citation 明细）。
+
 ## 实测（rag_m 自举）
-- 索引：145 文件、1,286 符号、1,328 chunks、约 1.5s（增量约 8ms）；
+- 索引：145 文件、1,287 符号、1,329 chunks（rag_m 自举；CLI/API 默认同一 SQLite）；
 - 检索：10 个标识符类问题 path/qualname hit@5 = 10/10（`tests/test_code_e2e.py`；问题含精确标识符，属偏乐观的 fixtures）；
+- 概览：`overview.kinds` 含 class/function/method，`top_paths` 为 `[{path, symbols}]` 按符号数 top 10；
 - 问答：10 题真实 LLM，引用 path 全部存在（refusal 情况已通过查询扩展 + 抽取式兜底收敛）。
 
 ## 限制

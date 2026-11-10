@@ -2,11 +2,12 @@
 
 用法：
     python scripts/index_code.py --root /path/to/repo --name myrepo
-    python scripts/index_code.py --root . --db data/code_index.sqlite --reindex --json
+    python scripts/index_code.py --root . --reindex --json
 
 说明：
 - v1 只支持 Python、只做 FTS5（--no-embed 为兼容保留参数，无向量嵌入）；
-- --root 必须位于 --allow-root 指定的目录内（默认当前用户 home）；
+- --db 默认与 API 一致：settings.code_store_path = $DATA_ROOT/data/code_index.sqlite；
+- --root 必须位于 --allow-root 指定的目录内（默认当前用户 home；显式空 allowed_roots = 全禁）；
 - 退出码：0 成功，2 参数/权限/路径错误。
 """
 from __future__ import annotations
@@ -17,9 +18,10 @@ import sys
 from pathlib import Path
 
 from ragm.code.indexer import CodeIndexer
+from ragm.config import get_settings
 
-ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_DB = ROOT / "data" / "code_index.sqlite"
+# 与 API 共用同一个索引：$DATA_ROOT/data/code_index.sqlite（CODE_DB_PATH 可覆盖）。
+DEFAULT_DB = get_settings().code_store_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -46,7 +48,8 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     root = Path(args.root).expanduser()
-    allowed = [Path(item).expanduser() for item in args.allow_root] if args.allow_root else [Path.home()]
+    # 未传 --allow-root 时交给 CodeIndexer 默认（home）；显式 [] 在全链路表示全禁。
+    allowed = [Path(item).expanduser() for item in args.allow_root] if args.allow_root else None
     indexer = CodeIndexer(Path(args.db).expanduser(), allowed)
     try:
         report = indexer.index(str(root), args.name or root.name, reindex=bool(args.reindex))

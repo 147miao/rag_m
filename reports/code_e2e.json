@@ -1,0 +1,584 @@
+{
+  "generated_at": "2026-11-10T14:02:40.326939+00:00",
+  "base_url": "http://127.0.0.1:8801",
+  "repo_id": "repo_88cf53a4065da92c",
+  "repo_name": "rag_m",
+  "repo_root": "/home/myj/develop_项目/rag_m",
+  "questions": 10,
+  "refusal_count": 0,
+  "citation_valid_rate": 1.0,
+  "expected_path_hit_rate": 1.0,
+  "p50_ms": 7619.1,
+  "avg_ms": 9663.1,
+  "results": [
+    {
+      "n": 1,
+      "question": "ToolExecutor run vector_search 如何分发",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 2,
+      "citation_details": [
+        {
+          "n": 2,
+          "path": "src/ragm/agent/tools.py",
+          "start_line": 149,
+          "end_line": 163,
+          "exists": true,
+          "line_count": 167,
+          "valid": true
+        },
+        {
+          "n": 1,
+          "path": "src/ragm/agent/tools.py",
+          "start_line": 71,
+          "end_line": 86,
+          "exists": true,
+          "line_count": 167,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        65,
+        163
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 7601.8,
+      "error": "",
+      "lead": "`ToolExecutor.run` 通过 `name` 字符串的 `if/elif` 分支进行分发，当 `name == \"vector_search\"` 时，它把 `args` 中的 `query` 和 `k` 传给 `self.vector_search`。"
+    },
+    {
+      "n": 2,
+      "question": "SessionStore get_history sqlite 历史",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 5,
+      "citation_details": [
+        {
+          "n": 3,
+          "path": "src/ragm/conversation/store.py",
+          "start_line": 202,
+          "end_line": 238,
+          "exists": true,
+          "line_count": 238,
+          "valid": true
+        },
+        {
+          "n": 5,
+          "path": "src/ragm/conversation/store.py",
+          "start_line": 193,
+          "end_line": 238,
+          "exists": true,
+          "line_count": 238,
+          "valid": true
+        },
+        {
+          "n": 1,
+          "path": "tests/test_conversation.py",
+          "start_line": 135,
+          "end_line": 150,
+          "exists": true,
+          "line_count": 522,
+          "valid": true
+        },
+        {
+          "n": 2,
+          "path": "tests/test_conversation.py",
+          "start_line": 153,
+          "end_line": 156,
+          "exists": true,
+          "line_count": 522,
+          "valid": true
+        },
+        {
+          "n": 6,
+          "path": "src/ragm/conversation/store.py",
+          "start_line": 83,
+          "end_line": 119,
+          "exists": true,
+          "line_count": 238,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        83,
+        238
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 5124.5,
+      "error": "",
+      "lead": "`SessionStore.get_history` 会从 SQLite 的 `messages` 表按 `id DESC` 取出最多 `safe_turns * 2` 条消息，再反转为时间正序，并在 `max_chars` 预算内从最旧一条开始丢弃。"
+    },
+    {
+      "n": 3,
+      "question": "ConfirmationStore consume token HMAC",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 2,
+      "citation_details": [
+        {
+          "n": 1,
+          "path": "src/ragm/mcp/confirmation.py",
+          "start_line": 138,
+          "end_line": 140,
+          "exists": true,
+          "line_count": 173,
+          "valid": true
+        },
+        {
+          "n": 2,
+          "path": "src/ragm/mcp/confirmation.py",
+          "start_line": 117,
+          "end_line": 136,
+          "exists": true,
+          "line_count": 173,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        83,
+        158
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 17309.5,
+      "error": "",
+      "lead": "已定位到 2 处相关代码（抽取式摘要）"
+    },
+    {
+      "n": 4,
+      "question": "FallbackLLM build_llm provider 降级",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 5,
+      "citation_details": [
+        {
+          "n": 1,
+          "path": "src/ragm/rag/llm_router.py",
+          "start_line": 464,
+          "end_line": 466,
+          "exists": true,
+          "line_count": 466,
+          "valid": true
+        },
+        {
+          "n": 3,
+          "path": "tests/test_llm_router.py",
+          "start_line": 277,
+          "end_line": 308,
+          "exists": true,
+          "line_count": 603,
+          "valid": true
+        },
+        {
+          "n": 2,
+          "path": "tests/test_llm_router.py",
+          "start_line": 311,
+          "end_line": 319,
+          "exists": true,
+          "line_count": 603,
+          "valid": true
+        },
+        {
+          "n": 5,
+          "path": "src/ragm/rag/llm_router.py",
+          "start_line": 316,
+          "end_line": 318,
+          "exists": true,
+          "line_count": 466,
+          "valid": true
+        },
+        {
+          "n": 6,
+          "path": "src/ragm/rag/llm_router.py",
+          "start_line": 312,
+          "end_line": 314,
+          "exists": true,
+          "line_count": 466,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        127,
+        461
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 6920.4,
+      "error": "",
+      "lead": "`build_llm` 会把 `settings`（未传入时取 `get_settings()`）交给 `FallbackLLM.from_settings`，按 `settings.resolved_llm_providers` 构建带降级链的 LLM 实例。[1]"
+    },
+    {
+      "n": 5,
+      "question": "JobRunner retry tick 重试",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 6,
+      "citation_details": [
+        {
+          "n": 3,
+          "path": "src/ragm/jobs/runner.py",
+          "start_line": 73,
+          "end_line": 108,
+          "exists": true,
+          "line_count": 126,
+          "valid": true
+        },
+        {
+          "n": 4,
+          "path": "src/ragm/jobs/runner.py",
+          "start_line": 70,
+          "end_line": 94,
+          "exists": true,
+          "line_count": 126,
+          "valid": true
+        },
+        {
+          "n": 6,
+          "path": "tests/test_jobs.py",
+          "start_line": 64,
+          "end_line": 70,
+          "exists": true,
+          "line_count": 400,
+          "valid": true
+        },
+        {
+          "n": 2,
+          "path": "src/ragm/jobs/runner.py",
+          "start_line": 31,
+          "end_line": 72,
+          "exists": true,
+          "line_count": 126,
+          "valid": true
+        },
+        {
+          "n": 1,
+          "path": "tests/test_jobs.py",
+          "start_line": 125,
+          "end_line": 141,
+          "exists": true,
+          "line_count": 400,
+          "valid": true
+        },
+        {
+          "n": 5,
+          "path": "tests/test_jobs.py",
+          "start_line": 73,
+          "end_line": 101,
+          "exists": true,
+          "line_count": 400,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        31,
+        126
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 5981.9,
+      "error": "",
+      "lead": "`JobRunner.tick()` 在任务执行抛异常时会按 `retry_delays` 计算退避时间并调用 `store.schedule_retry` 把任务重新排队，退避未到期前 `claim_next` 不会再领取该任务。"
+    },
+    {
+      "n": 6,
+      "question": "build pipeline file_hash 增量",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 3,
+      "citation_details": [
+        {
+          "n": 1,
+          "path": "src/ragm/ingest/pipeline.py",
+          "start_line": 18,
+          "end_line": 23,
+          "exists": true,
+          "line_count": 157,
+          "valid": true
+        },
+        {
+          "n": 3,
+          "path": "src/ragm/ingest/pipeline.py",
+          "start_line": 67,
+          "end_line": 111,
+          "exists": true,
+          "line_count": 157,
+          "valid": true
+        },
+        {
+          "n": 2,
+          "path": "src/ragm/ingest/pipeline.py",
+          "start_line": 112,
+          "end_line": 144,
+          "exists": true,
+          "line_count": 157,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        67,
+        157
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 10224.3,
+      "error": "",
+      "lead": "`build` 通过比较 manifest 中记录的 `file_hash` 与当前文件的 SHA1 摘要来判断是否增量跳过，内容未变且行缓存存在时直接跳过，否则重建并更新 manifest。"
+    },
+    {
+      "n": 7,
+      "question": "health providers circuit_open 健康检查",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 3,
+      "citation_details": [
+        {
+          "n": 3,
+          "path": "src/ragm/api/routes.py",
+          "start_line": 187,
+          "end_line": 208,
+          "exists": true,
+          "line_count": 399,
+          "valid": true
+        },
+        {
+          "n": 2,
+          "path": "tests/test_llm_router.py",
+          "start_line": 552,
+          "end_line": 573,
+          "exists": true,
+          "line_count": 603,
+          "valid": true
+        },
+        {
+          "n": 1,
+          "path": "tests/test_llm_router.py",
+          "start_line": 591,
+          "end_line": 603,
+          "exists": true,
+          "line_count": 603,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        187,
+        255
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 10537.6,
+      "error": "",
+      "lead": "`/api/health` 的 `providers` 检查会按每个 provider 的 `state` 推导 `circuit_open`，且整体 `providers.ok` 只取决于第一个 provider（主 provider）是否可用 [3][2]。"
+    },
+    {
+      "n": 8,
+      "question": "build_classifier rules lora 分类器",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 6,
+      "citation_details": [
+        {
+          "n": 1,
+          "path": "src/ragm/classifier/factory.py",
+          "start_line": 37,
+          "end_line": 58,
+          "exists": true,
+          "line_count": 58,
+          "valid": true
+        },
+        {
+          "n": 5,
+          "path": "src/ragm/config.py",
+          "start_line": 104,
+          "end_line": 151,
+          "exists": true,
+          "line_count": 228,
+          "valid": true
+        },
+        {
+          "n": 2,
+          "path": "tests/test_prep_interfaces.py",
+          "start_line": 31,
+          "end_line": 41,
+          "exists": true,
+          "line_count": 210,
+          "valid": true
+        },
+        {
+          "n": 6,
+          "path": "src/ragm/classifier/lora.py",
+          "start_line": 73,
+          "end_line": 74,
+          "exists": true,
+          "line_count": 74,
+          "valid": true
+        },
+        {
+          "n": 3,
+          "path": "scripts/train_route_cls.py",
+          "start_line": 48,
+          "end_line": 55,
+          "exists": true,
+          "line_count": 346,
+          "valid": true
+        },
+        {
+          "n": 4,
+          "path": "scripts/train_route_cls.py",
+          "start_line": 214,
+          "end_line": 251,
+          "exists": true,
+          "line_count": 346,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        37,
+        58
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 7266.1,
+      "error": "",
+      "lead": "`build_classifier` 按 `settings.classifier_backend` 选择分类器后端：`rules` 直接构造 `RulesClassifier()`，`lora` 需要同时配置 `classifier_run_dir` 才会构造 `LoRAClassifier`，否则回落到 rules"
+    },
+    {
+      "n": 9,
+      "question": "MilvusStore hybrid_search BM25 混合检索",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 6,
+      "citation_details": [
+        {
+          "n": 1,
+          "path": "src/ragm/store/milvus_store.py",
+          "start_line": 72,
+          "end_line": 78,
+          "exists": true,
+          "line_count": 96,
+          "valid": true
+        },
+        {
+          "n": 3,
+          "path": "src/ragm/store/milvus_store.py",
+          "start_line": 72,
+          "end_line": 96,
+          "exists": true,
+          "line_count": 96,
+          "valid": true
+        },
+        {
+          "n": 6,
+          "path": "src/ragm/store/milvus_store.py",
+          "start_line": 39,
+          "end_line": 71,
+          "exists": true,
+          "line_count": 96,
+          "valid": true
+        },
+        {
+          "n": 2,
+          "path": "src/ragm/store/milvus_store.py",
+          "start_line": 44,
+          "end_line": 45,
+          "exists": true,
+          "line_count": 96,
+          "valid": true
+        },
+        {
+          "n": 5,
+          "path": "scripts/eval_all_dilution.py",
+          "start_line": 66,
+          "end_line": 79,
+          "exists": true,
+          "line_count": 83,
+          "valid": true
+        },
+        {
+          "n": 4,
+          "path": "src/ragm/store/milvus_store.py",
+          "start_line": 87,
+          "end_line": 92,
+          "exists": true,
+          "line_count": 96,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        12,
+        96
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 7636.4,
+      "error": "",
+      "lead": "`hybrid_search` 会同时发起稠密 COSINE 向量检索和 BM25 稀疏文本检索，再用 `RRFRanker` 融合两路结果并返回 top-k；它依赖 collection 中由 BM25 Function 生成的 sparse 字段及其 BM25 索引。"
+    },
+    {
+      "n": 10,
+      "question": "LangGraphRagService stream",
+      "refusal": false,
+      "refusal_reason": "",
+      "citations": 3,
+      "citation_details": [
+        {
+          "n": 2,
+          "path": "src/ragm/rag/langgraph_service.py",
+          "start_line": 281,
+          "end_line": 297,
+          "exists": true,
+          "line_count": 319,
+          "valid": true
+        },
+        {
+          "n": 3,
+          "path": "src/ragm/rag/langgraph_service.py",
+          "start_line": 288,
+          "end_line": 319,
+          "exists": true,
+          "line_count": 319,
+          "valid": true
+        },
+        {
+          "n": 1,
+          "path": "src/ragm/rag/langgraph_service.py",
+          "start_line": 303,
+          "end_line": 310,
+          "exists": true,
+          "line_count": 319,
+          "valid": true
+        }
+      ],
+      "citations_valid": true,
+      "expected_path_hit": true,
+      "expected_line_range": [
+        39,
+        319
+      ],
+      "expected_line_covered": true,
+      "provider": "opencode-go",
+      "latency_ms": 18029.0,
+      "error": "",
+      "lead": "LangGraphRagService.stream 先产出阶段事件，再通过 `_aiter_tokens` 把同步 LLM 的 token 流转成异步迭代，逐条 `yield TokenEvent`，最后产出 `DoneEvent`。"
+    }
+  ]
+}

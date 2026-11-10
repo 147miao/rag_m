@@ -262,7 +262,10 @@ async def test_overview_and_impact(make_app, store, repo_id) -> None:
         "file_count": 7,
         "symbol_count": 11,
         "kinds": {"function": 8, "class": 3},
-        "top_paths": ["src/a.py", "src/b.py"],
+        "top_paths": [
+            {"path": "src/a.py", "symbols": 6},
+            {"path": "src/b.py", "symbols": 2},
+        ],
         "note": "ok",
     }
     store.imports[(repo_id, "src/a.py")] = ["src/b.py", "src/c.py"]
@@ -279,7 +282,10 @@ async def test_overview_and_impact(make_app, store, repo_id) -> None:
     assert data["name"] == "demo"
     assert data["file_count"] == 7 and data["symbol_count"] == 11
     assert data["kinds"] == {"function": 8, "class": 3}
-    assert data["top_paths"] == ["src/a.py", "src/b.py"]
+    assert data["top_paths"] == [
+        {"path": "src/a.py", "symbols": 6},
+        {"path": "src/b.py", "symbols": 2},
+    ]
     assert impact.status_code == 200
     payload = impact.json()
     assert payload["imports"] == ["src/b.py", "src/c.py"]

@@ -24,7 +24,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from .. import __version__
 from ..agent.agent_graph import AgentGraph
-from ..agent.tools import ToolExecutor
+from ..agent.code_tools import CodeToolExecutor
+from ..agent.tools import ToolExecutor, build_tool_schemas
 from ..classifier.factory import build_classifier
 from ..code.indexer import CodeIndexer
 from ..code.service import CodeService
@@ -134,7 +135,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 logger.info("reranker ready: %s", settings.rerank_model)
             except Exception:
                 logger.warning("reranker unavailable", exc_info=True)
-        executor = ToolExecutor(app.state.search, app.state.kg, settings)
+        code_service = getattr(app.state, "code_service", None)
+        include_code_tools = bool(settings.code_enabled and code_service is not None)
+        code_executor = CodeToolExecutor(code_service) if include_code_tools else None
+        executor = ToolExecutor(
+            app.state.search,
+            app.state.kg,
+            settings,
+            code_executor=code_executor,
+        )
         agent = AgentGraph(
             llm,
             executor,
@@ -143,6 +152,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             max_calls=settings.agent_max_calls,
             total_tokens=settings.agent_max_tokens,
             retry=settings.agent_retry,
+            tool_schemas=build_tool_schemas(include_code_tools),
         )
         app.state.service = LangGraphRagService(
             app.state.classifier, app.state.search, llm, settings, kg=app.state.kg, agent=agent, executor=executor, reranker=reranker

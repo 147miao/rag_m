@@ -25,6 +25,7 @@ MAX_SEARCH_K = 100
 MAX_FTS_TERMS = 16
 FTS_TOKEN_RE = re.compile(r"[0-9A-Za-z_]+")
 LIKE_ESCAPE = "!"
+TOP_PATH_LIMIT = 10
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS repos (
@@ -517,6 +518,11 @@ class CodeStore:
             kind_rows = conn.execute(
                 "SELECT kind, COUNT(*) AS total FROM symbols WHERE repo_id = ? GROUP BY kind", (repo_id,)
             ).fetchall()
+            path_rows = conn.execute(
+                "SELECT path, COUNT(*) AS total FROM symbols WHERE repo_id = ? "
+                "GROUP BY path ORDER BY total DESC, path ASC LIMIT ?",
+                (repo_id, TOP_PATH_LIMIT),
+            ).fetchall()
         by_kind = {str(row["kind"]): int(row["total"]) for row in kind_rows}
         return {
             **repo,
@@ -526,6 +532,10 @@ class CodeStore:
             "class_count": by_kind.get("class", 0),
             "function_count": by_kind.get("function", 0),
             "method_count": by_kind.get("method", 0),
+            "kinds": by_kind,
+            "top_paths": [
+                {"path": str(row["path"]), "symbols": int(row["total"])} for row in path_rows
+            ],
             "import_count": import_count,
             "reference_count": reference_count,
             "chunk_count": chunk_count,

@@ -29,6 +29,18 @@ def test_self_index_has_symbols(indexed):
     assert store.get_repo(repo_id) is not None
 
 
+def test_overview_has_kinds_and_top_paths(indexed):
+    """P1-1：真实 rag_m 概览必须带非空 kinds 与 top_paths（含 path/symbols）。"""
+    store, repo_id, _ = indexed
+    overview = store.overview(repo_id)
+    assert {"class", "function", "method"} <= set(overview["kinds"]), overview["kinds"]
+    top_paths = overview["top_paths"]
+    assert top_paths, "top_paths must not be empty"
+    assert {"path", "symbols"} <= set(top_paths[0])
+    assert top_paths[0]["path"].endswith(".py")
+    assert top_paths[0]["symbols"] >= top_paths[-1]["symbols"]
+
+
 @pytest.mark.parametrize("case", CASES, ids=[c["question"][:18] for c in CASES])
 def test_search_hits_expected_path(indexed, case):
     store, repo_id, _ = indexed
@@ -37,6 +49,15 @@ def test_search_hits_expected_path(indexed, case):
     assert any(expected in p for p in paths for expected in case["expect_paths"]), paths
     quals = [h["qualname"] for h in hits]
     assert any(q in qual or qual.startswith(q) for q in case.get("expect_qualnames", []) for qual in quals), quals
+    line_range = case.get("expect_line_range")
+    if line_range:
+        exp_start, exp_end = int(line_range[0]), int(line_range[1])
+        assert any(
+            any(expected in hit["path"] for expected in case["expect_paths"])
+            and hit["start_line"] <= exp_end
+            and exp_start <= hit["end_line"]
+            for hit in hits
+        ), hits
 
 
 @pytest.mark.parametrize("case", CASES, ids=[c["question"][:18] for c in CASES])

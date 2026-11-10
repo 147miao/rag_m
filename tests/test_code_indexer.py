@@ -217,6 +217,45 @@ def test_chunker_splits_long_symbol_deterministically() -> None:
     ]
 
 
+def test_empty_allowed_roots_denies_all(tmp_path: Path) -> None:
+    """P2-7：显式 [] 与 API 路由一致 = 全禁；None 才回退 home。"""
+    root = _make_repo(tmp_path)
+    db = tmp_path / "code.sqlite"
+    indexer = CodeIndexer(db, [])
+    with pytest.raises(RootNotAllowedError):
+        indexer.index(str(root), "demo")
+    assert CodeStore(db).list_repos() == []
+
+
+def test_cli_default_db_uses_settings(tmp_path: Path) -> None:
+    """P1-4：CLI 不传 --db 时使用 settings.code_store_path（CODE_DB_PATH 覆盖）。"""
+    root = _make_repo(tmp_path)
+    db = tmp_path / "settings-code-index.sqlite"
+    env = {**os.environ, "PYTHONPATH": str(ROOT / "src"), "CODE_DB_PATH": str(db)}
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(ROOT / "scripts" / "index_code.py"),
+            "--root",
+            str(root),
+            "--name",
+            "cli-default-db",
+            "--allow-root",
+            str(tmp_path),
+            "--json",
+        ],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=120,
+        check=False,
+    )
+    assert proc.returncode == 0, proc.stderr
+    report = json.loads(proc.stdout)
+    assert set(report) == REPORT_KEYS
+    assert db.is_file()
+
+
 def test_cli_json_and_no_embed(tmp_path: Path) -> None:
     root = _make_repo(tmp_path)
     db = tmp_path / "cli.sqlite"

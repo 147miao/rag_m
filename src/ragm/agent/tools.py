@@ -1,10 +1,11 @@
-"""Agentic 工具：vector_search / kg_query / web_search。"""
+"""Agentic 工具：vector_search / kg_query / web_search（可选追加 code-insight 工具）。"""
 from __future__ import annotations
 
 import json
 import time
 import urllib.parse
 import xml.etree.ElementTree as ET
+from typing import Any
 
 import httpx
 
@@ -12,6 +13,8 @@ from ..config import Settings
 from ..graph.kg import KGStore
 from ..observability.tracing import traceable
 from ..store.search_service import SearchService
+
+CODE_TOOL_NAMES = frozenset({"search_code", "get_symbol", "impact_analysis", "repo_overview"})
 
 TOOL_SCHEMAS: list[dict] = [
     {
@@ -62,11 +65,29 @@ TOOL_SCHEMAS: list[dict] = [
 ]
 
 
+def build_tool_schemas(include_code: bool = False) -> list[dict]:
+    """返回 agent 工具 schema；默认保持原有 3 个，include_code=True 追加代码工具。"""
+    schemas = list(TOOL_SCHEMAS)
+    if include_code:
+        # 延迟导入：代码模式关闭时不加载 code-insight 模块。
+        from .code_tools import CODE_TOOL_SCHEMAS
+
+        schemas.extend(CODE_TOOL_SCHEMAS)
+    return schemas
+
+
 class ToolExecutor:
-    def __init__(self, search: SearchService, kg: KGStore | None, settings: Settings) -> None:
+    def __init__(
+        self,
+        search: SearchService,
+        kg: KGStore | None,
+        settings: Settings,
+        code_executor: Any | None = None,
+    ) -> None:
         self.search = search
         self.kg = kg
         self.settings = settings
+        self.code_executor = code_executor
 
     @traceable(run_type="tool", name="vector_search")
     def vector_search(self, query: str, k: int = 6) -> dict:
@@ -149,7 +170,9 @@ class ToolExecutor:
     def run(self, name: str, args: dict) -> dict:
         t0 = time.perf_counter()
         try:
-            if name == "vector_search":
+            if name in CODE_TOOL_NAMES and self.code_executor is not None:
+                out = self.code_executor.execute(name, args)
+            elif name == "vector_search":
                 out = self.vector_search(args.get("query", ""), args.get("k", 6))
             elif name == "kg_query":
                 out = self.kg_query(args.get("entity", ""), args.get("hops", 1))

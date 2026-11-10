@@ -6,7 +6,8 @@
     ],
     "expect_qualnames": [
       "ToolExecutor"
-    ]
+    ],
+    "expect_line_range": [65, 163]
   },
   {
     "question": "SessionStore get_history sqlite 历史",
@@ -15,7 +16,8 @@
     ],
     "expect_qualnames": [
       "SessionStore"
-    ]
+    ],
+    "expect_line_range": [83, 238]
   },
   {
     "question": "ConfirmationStore consume token HMAC",
@@ -24,7 +26,8 @@
     ],
     "expect_qualnames": [
       "ConfirmationStore"
-    ]
+    ],
+    "expect_line_range": [83, 158]
   },
   {
     "question": "FallbackLLM build_llm provider 降级",
@@ -33,7 +36,8 @@
     ],
     "expect_qualnames": [
       "FallbackLLM"
-    ]
+    ],
+    "expect_line_range": [127, 461]
   },
   {
     "question": "JobRunner retry tick 重试",
@@ -42,7 +46,8 @@
     ],
     "expect_qualnames": [
       "JobRunner"
-    ]
+    ],
+    "expect_line_range": [31, 126]
   },
   {
     "question": "build pipeline file_hash 增量",
@@ -51,7 +56,8 @@
     ],
     "expect_qualnames": [
       "build"
-    ]
+    ],
+    "expect_line_range": [67, 157]
   },
   {
     "question": "health providers circuit_open 健康检查",
@@ -60,7 +66,8 @@
     ],
     "expect_qualnames": [
       "health"
-    ]
+    ],
+    "expect_line_range": [187, 255]
   },
   {
     "question": "build_classifier rules lora 分类器",
@@ -69,7 +76,8 @@
     ],
     "expect_qualnames": [
       "build_classifier"
-    ]
+    ],
+    "expect_line_range": [37, 58]
   },
   {
     "question": "MilvusStore hybrid_search BM25 混合检索",
@@ -78,7 +86,8 @@
     ],
     "expect_qualnames": [
       "MilvusStore"
-    ]
+    ],
+    "expect_line_range": [12, 96]
   },
   {
     "question": "LangGraphRagService stream",
@@ -87,6 +96,7 @@
     ],
     "expect_qualnames": [
       "LangGraphRagService"
-    ]
+    ],
+    "expect_line_range": [39, 319]
   }
 ]
