@@ -314,7 +314,39 @@ def test_build_llm_skips_default_primary_without_key(monkeypatch) -> None:
 
     llm = build_llm(settings)
 
-    assert llm.provider_names == ["ollama"]
+    # 缺主 provider key 时仍保留两级 Ollama 兜底。
+    assert llm.provider_names == ["ollama", "ollama-qwen"]
+    assert [client.model for client in llm.clients] == ["gemma4:31b-cloud", "qwen2.5:1.5b-instruct"]
+
+
+def test_default_provider_chain_has_three_levels(monkeypatch) -> None:
+    monkeypatch.setenv("OPENCODE_GO_API_KEY", "fake-key")
+    settings = Settings(_env_file=None, llm_providers="")
+
+    llm = build_llm(settings)
+
+    assert llm.provider_names == ["opencode-go", "ollama", "ollama-qwen"]
+    assert [client.model for client in llm.clients] == [
+        "deepseek-v4.1-flash",
+        "gemma4:31b-cloud",
+        "qwen2.5:1.5b-instruct",
+    ]
+
+
+def test_fallback_to_third_provider_when_first_two_unavailable() -> None:
+    primary = FakeClient("opencode-go", chat_error=LLMError("401 missing api key"))
+    backup = FakeClient("ollama", chat_error=LLMError("402: Add usage credits"))
+    fallback = FakeClient(
+        "ollama-qwen",
+        chat_result={"text": "本地兜底 [1]", "tokens_in": 12, "tokens_out": 6},
+    )
+    llm = FallbackLLM([primary, backup, fallback])
+
+    result = llm.chat([{"role": "user", "content": "鸣人的父亲是谁？"}], max_tokens=64)
+
+    assert result["text"] == "本地兜底 [1]"
+    assert llm.last_provider == "ollama-qwen"
+    assert (primary.chat_calls, backup.chat_calls, fallback.chat_calls) == (1, 1, 1)
 
 
 def test_load_env_file_fills_missing_provider_key(monkeypatch, tmp_path) -> None:
@@ -456,6 +488,42 @@ def test_real_primary_provider_chat_and_stream(monkeypatch) -> None:
         stream.close()
     assert first.strip(), "primary stream 首 token 为空"
     assert llm.last_provider == "opencode-go"
+
+
+@pytest.mark.skipif(os.environ.get("RAGM_LLM_E2E") != "1", reason="真实 LLM 集成测试，设 RAGM_LLM_E2E=1 开启")
+def test_real_third_provider_fallback_when_first_two_unavailable() -> None:
+    """前两级不可用（假 key / gemma4 402），真实落到本地 Ollama qwen2.5:1.5b-instruct。"""
+    primary = FakeClient("opencode-go", chat_error=LLMError("401 missing api key"))
+    backup = FakeClient("ollama", chat_error=LLMError("402: Add usage credits"))
+    llm = FallbackLLM(
+        [
+            primary,
+            backup,
+            {
+                "name": "ollama-qwen",
+                "base_url": "http://127.0.0.1:11434/v1",
+                "model": "qwen2.5:1.5b-instruct",
+                "api_key": "ollama",
+                "first_token_timeout": 30,
+            },
+        ],
+        chat_timeout=60,
+    )
+
+    started = time.perf_counter()
+    result = llm.chat(
+        [{"role": "user", "content": "用一句话回答：鸣人的父亲是谁？"}],
+        max_tokens=128,
+    )
+    elapsed = time.perf_counter() - started
+
+    assert result["text"].strip(), "末级 provider 返回空内容"
+    assert llm.last_provider == "ollama-qwen"
+    assert (primary.chat_calls, backup.chat_calls) == (1, 1)
+    print(
+        f"\n[third fallback] provider={llm.last_provider} elapsed={elapsed * 1000:.0f}ms "
+        f"text={result['text'].strip()[:20]!r} tokens={result['tokens_in']}/{result['tokens_out']}"
+    )
 
 
 # ---------- health ----------

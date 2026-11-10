@@ -10,8 +10,9 @@ from typing import Any
 from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
-# v1.1 内置 LLM provider 链：opencode-go 主，ollama 备（可用 LLM_PROVIDERS JSON 覆盖）。
-# model 必须是 relay `GET {base_url}/models` 实际返回的 id（本机：deepseek-v4.1-flash），否则 404 后降级。
+# v1.1 内置 LLM provider 链：opencode-go 主 → ollama gemma4 备 → 本地 ollama qwen2.5 兜底
+# （gemma4 免费额度用尽时上游返回 402，自动落到本地小模型；可用 LLM_PROVIDERS JSON 覆盖）。
+# model 必须是对应服务实际返回的 id（relay 看 GET /v1/models），否则 404 后降级。
 DEFAULT_LLM_PROVIDERS: tuple[dict[str, Any], ...] = (
     {
         "name": "opencode-go",
@@ -26,6 +27,14 @@ DEFAULT_LLM_PROVIDERS: tuple[dict[str, Any], ...] = (
         "name": "ollama",
         "base_url": "http://127.0.0.1:11434/v1",
         "model": "gemma4:31b-cloud",
+        "api_key": "ollama",
+        "first_token_timeout": 20,
+    },
+    {
+        # 末级兜底：gemma4 云模型额度用尽（402）时用本地 1.5B 小模型；只保可用，不保证质量。
+        "name": "ollama-qwen",
+        "base_url": "http://127.0.0.1:11434/v1",
+        "model": "qwen2.5:1.5b-instruct",
         "api_key": "ollama",
         "first_token_timeout": 20,
     },

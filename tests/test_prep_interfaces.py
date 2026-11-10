@@ -185,9 +185,12 @@ def test_settings_v11_defaults(monkeypatch) -> None:
     assert settings.jobs_max_attempts == 4
 
     providers = settings.resolved_llm_providers
-    assert [item["name"] for item in providers] == ["opencode-go", "ollama"]
-    assert providers[0]["model"] == "deepseek-v4.1-flash"
-    assert providers[1]["model"] == "gemma4:31b-cloud"
+    assert [item["name"] for item in providers] == ["opencode-go", "ollama", "ollama-qwen"]
+    assert [item["model"] for item in providers] == [
+        "deepseek-v4.1-flash",
+        "gemma4:31b-cloud",
+        "qwen2.5:1.5b-instruct",
+    ]
 
 
 def test_settings_explicit_paths_and_provider_json(monkeypatch) -> None:

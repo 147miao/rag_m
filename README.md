@@ -52,7 +52,7 @@ agentic 路由则走 `plan → tools → plan … → synthesize → verify` 的
 | 实验工具 | 分类器训练/评测、embedding/reranker/chunk 横向评测、并行基准编排 |
 | 多轮会话 | SQLite 会话历史 + 指代消解 + 子问题拆解 + 多查询检索（/api/sessions） |
 | MCP 工具 | 自写 MCP Server（list_dir/read_file/write_note），敏感工具 requires_confirmation + token |
-| LLM 降级 | opencode-go `deepseek-v4.1-flash` 主 → Ollama gemma4:31b-cloud 备；首 token 超时 + 熔断；relay 会话头 `x-opencode-session` 由 `extra_headers` 的 `$UUID` 每次请求生成 |
+| LLM 降级 | opencode-go `deepseek-v4.1-flash` 主 → Ollama gemma4:31b-cloud 备 → 本地 Ollama `qwen2.5:1.5b-instruct` 末级兜底（gemma4 免费额度 402 时；1.5B 小模型只保可用、不保证质量）；首 token 超时 + 熔断；relay 会话头 `x-opencode-session` 由 `extra_headers` 的 `$UUID` 每次请求生成 |
 | 异步入库 | SQLite 任务表 + 单 worker + 重试/恢复（/api/ingest、/api/jobs） |
 
 ## 三、快速开始
@@ -143,7 +143,7 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 
 ## 三·七、CI 与容器
 
-- `make ci`：ruff（src/tests/scripts）+ pytest（**143 passed + 2 skipped**；设 `RAGM_LLM_E2E=1` 且配置 primary key 时 145 passed）+ 前端 build，本地等价 CI；
+- `make ci`：ruff（src/tests/scripts）+ pytest（**145 passed + 3 skipped**；设 `RAGM_LLM_E2E=1` 且配置 primary key 时 148 passed）+ 前端 build，本地等价 CI；
 - GitHub Actions：`.github/workflows/ci.yml`（lint + tests + 检索门禁 + web build）；
 - 容器：`docker/Dockerfile.api` + compose `app` profile（含 GPU 直通、`/api/readyz` 健康检查）。
   数据/模型需放 `$HOME/ragm_data` 并挂载到容器 `/data`；镜像未在本机实际构建（torch 体积大）。
@@ -180,7 +180,7 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 `LLM_PROVIDERS` 单行 JSON 示例（键：`name` / `base_url` / `model` / `api_key_env` / `api_key` / `first_token_timeout` / `extra_headers`）：
 
 ```bash
-LLM_PROVIDERS='[{"name":"opencode-go","base_url":"http://127.0.0.1:8788/inference/go/v1","model":"deepseek-v4.1-flash","api_key_env":"OPENCODE_GO_API_KEY","extra_headers":{"x-opencode-session":"$UUID"},"first_token_timeout":15},{"name":"ollama","base_url":"http://127.0.0.1:11434/v1","model":"gemma4:31b-cloud","api_key":"ollama","first_token_timeout":20}]'
+LLM_PROVIDERS='[{"name":"opencode-go","base_url":"http://127.0.0.1:8788/inference/go/v1","model":"deepseek-v4.1-flash","api_key_env":"OPENCODE_GO_API_KEY","extra_headers":{"x-opencode-session":"$UUID"},"first_token_timeout":15},{"name":"ollama","base_url":"http://127.0.0.1:11434/v1","model":"gemma4:31b-cloud","api_key":"ollama","first_token_timeout":20},{"name":"ollama-qwen","base_url":"http://127.0.0.1:11434/v1","model":"qwen2.5:1.5b-instruct","api_key":"ollama","first_token_timeout":20}]'
 ```
 
 `extra_headers` 是「请求头 → 值」对象；值里的 `$UUID` 每次请求替换为新 uuid4。
