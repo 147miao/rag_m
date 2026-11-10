@@ -155,6 +155,8 @@ def test_overview_and_reindex(store: CodeStore, tmp_path: Path) -> None:
     assert overview["function_count"] == 1
     assert overview["method_count"] == 1
     assert overview["symbol_count"] == 4
+    assert overview["kinds"]["class"] == 1 and overview["kinds"]["function"] == 1
+    assert overview["top_paths"] == [{"path": "pkg/mod.py", "symbols": 4}]
     assert overview["import_count"] == 1
     assert overview["reference_count"] == 3  # os / name / ToolExecutor
     assert overview["chunk_count"] == 3

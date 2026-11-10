@@ -144,17 +144,21 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 ## 三·八、代码库分析（code-insight）
 
 ```bash
+# 默认写入 $DATA_ROOT/data/code_index.sqlite（与 API 共用；CODE_DB_PATH 覆盖）
 python scripts/index_code.py --root ~/my_repo --name myrepo --reindex
 # 或 POST /api/code/repos {root, name}
 ```
 
 - Python only；SQLite FTS5（无 GPU/Milvus）；函数/类级 chunk + 符号表 + 文件级 impact；
+- API 的 `overview.kinds` 非空，`top_paths` 为按符号数排序的 `[{path, symbols}]`（top 10）；
 - `/api/code/ask` 返回 `path:start-end` 引用；中文问题建议包含标识符/路径（FTS5 不切分中文）；
+- CLI 省略 `--allow-root` = `[home]`；API `CODE_ALLOWED_ROOTS` 默认 `[home]`，显式 `[]` = 全禁；
+- E2E：`python scripts/code_e2e.py --base-url http://127.0.0.1:8000 --repo-name rag_m`，输出 `reports/code_e2e.md` + JSON；
 - 详见 [docs/23-code-insight.md](docs/23-code-insight.md)。
 
 ## 三·七、CI 与容器
 
-- `make ci`：ruff（src/tests/scripts）+ pytest（**145 passed + 3 skipped**；设 `RAGM_LLM_E2E=1` 且配置 primary key 时 148 passed）+ 前端 build，本地等价 CI；
+- `make ci`：ruff（src/tests/scripts）+ pytest（**224 passed + 3 skipped**；code-insight 修复前基线为 217 passed + 3 skipped；`RAGM_LLM_E2E=1` 的 LLM E2E 本轮未复测）+ 前端 build，本地等价 CI；
 - GitHub Actions：`.github/workflows/ci.yml`（lint + tests + 检索门禁 + web build）；
 - 容器：`docker/Dockerfile.api` + compose `app` profile（含 GPU 直通、`/api/readyz` 健康检查）。
   数据/模型需放 `$HOME/ragm_data` 并挂载到容器 `/data`；镜像未在本机实际构建（torch 体积大）。
@@ -187,6 +191,7 @@ python scripts/index_code.py --root ~/my_repo --name myrepo --reindex
 | `LLM_PROVIDERS` / `LLM_CHAT_TIMEOUT` / `LLM_FIRST_TOKEN_TIMEOUT` | 空（内置链）/ 60 / 15 | provider 链单行 JSON；整请求/首 token 超时；`/api/health` 的 `providers` 检查逐个返回各 provider 的 `state` / `failures` |
 | `OPENCODE_GO_API_KEY` | 空 | opencode-go 主 provider 的 key（只从环境变量读；API 启动时会把仓库根 `.env` 补进进程环境，见下） |
 | `JOBS_DB_PATH` / `JOBS_WORKER` / `JOBS_MAX_ATTEMPTS` | 空 / true / 4 | 任务表路径、worker 开关、总尝试次数（4 = 1 次初始 + 3 次重试） |
+| `CODE_ENABLED` / `CODE_DB_PATH` / `CODE_ALLOWED_ROOTS` | true / 空 / `[home]` | 代码模式开关、SQLite 路径（空 = `$DATA_ROOT/data/code_index.sqlite`，与 CLI 默认一致）、允许索引的根目录 JSON 数组（显式 `[]` = 全禁） |
 
 `LLM_PROVIDERS` 单行 JSON 示例（键：`name` / `base_url` / `model` / `api_key_env` / `api_key` / `first_token_timeout` / `extra_headers`）：
 

@@ -2,14 +2,17 @@
 from __future__ import annotations
 
 from ragm.agent.agent_graph import AgentGraph
+from ragm.agent.tools import TOOL_SCHEMAS
 
 
 class FakeLLM:
     def __init__(self) -> None:
         self.calls = 0
+        self.schemas = None
 
     def chat_tools(self, messages, schemas, max_tokens=600):
         self.calls += 1
+        self.schemas = schemas
         return {
             "text": "",
             "tool_calls": [{"id": f"c{self.calls}", "function": {"name": "vector_search", "arguments": '{"query": "q"}'}}],
@@ -48,3 +51,18 @@ def test_retry_recovers() -> None:
     out = graph.invoke("测试问题")
     assert out["tool_log"][0]["status"] == "ok"
     assert out["tool_log"][0]["attempts"] == 2
+
+
+def test_agent_graph_uses_custom_tool_schemas() -> None:
+    llm = FakeLLM()
+    custom = [{"type": "function", "function": {"name": "custom_tool", "parameters": {"type": "object"}}}]
+    graph = AgentGraph(llm, FakeExecutor(), tool_schemas=custom)
+    graph.invoke("测试问题")
+    assert llm.schemas is custom
+
+
+def test_agent_graph_defaults_to_doc_tool_schemas() -> None:
+    llm = FakeLLM()
+    graph = AgentGraph(llm, FakeExecutor())
+    graph.invoke("测试问题")
+    assert llm.schemas is TOOL_SCHEMAS

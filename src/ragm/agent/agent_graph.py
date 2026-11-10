@@ -60,9 +60,12 @@ class AgentGraph:
         max_calls: int = 4,
         total_tokens: int = 8000,
         retry: int = 1,
+        tool_schemas: list[dict] | None = None,
     ) -> None:
         self.llm = llm
         self.executor = executor
+        # None = 保持旧行为（仅 3 个文档检索工具）；可传入 build_tool_schemas(True) 启用代码工具。
+        self.tool_schemas = tool_schemas if tool_schemas is not None else TOOL_SCHEMAS
         self.max_iterations = max_iterations
         self.max_tokens = max_tokens
         self.max_calls = max_calls
@@ -75,7 +78,7 @@ class AgentGraph:
     def _plan_node(self, state: AgentState) -> dict:
         t0 = time.perf_counter()
         messages = list(state.get("messages") or [])
-        out = self.llm.chat_tools(messages, TOOL_SCHEMAS, max_tokens=600)
+        out = self.llm.chat_tools(messages, self.tool_schemas, max_tokens=600)
         calls = out.get("tool_calls") or []
         assistant: dict[str, Any] = {"role": "assistant", "content": out.get("text") or ""}
         if calls:

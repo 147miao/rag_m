@@ -86,6 +86,11 @@ class SymbolInfo(CodeModel):
 
 # ---------- overview / impact ----------
 
+class TopPath(CodeModel):
+    path: str
+    symbols: int = Field(default=0, ge=0)
+
+
 class OverviewResponse(CodeModel):
     repo_id: str
     name: str = ""
@@ -93,7 +98,7 @@ class OverviewResponse(CodeModel):
     file_count: int = Field(default=0, ge=0)
     symbol_count: int = Field(default=0, ge=0)
     kinds: dict[str, int] = Field(default_factory=dict)
-    top_paths: list[str] = Field(default_factory=list)
+    top_paths: list[TopPath] = Field(default_factory=list)
     status: str = "ready"
     note: str = ""
 

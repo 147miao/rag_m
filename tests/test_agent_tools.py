@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import os
 
-from ragm.agent.tools import TOOL_SCHEMAS, ToolExecutor, tool_result_text
+from ragm.agent.tools import TOOL_SCHEMAS, ToolExecutor, build_tool_schemas, tool_result_text
 from ragm.config import Settings
 from ragm.observability import tracing
 
@@ -13,6 +13,46 @@ def test_tool_schemas() -> None:
     assert names == ["vector_search", "kg_query", "web_search"]
     for t in TOOL_SCHEMAS:
         assert t["function"]["parameters"]["type"] == "object"
+
+
+def test_build_tool_schemas_default_and_with_code() -> None:
+    default = build_tool_schemas()
+    assert [t["function"]["name"] for t in default] == ["vector_search", "kg_query", "web_search"]
+    assert default == TOOL_SCHEMAS
+
+    with_code = build_tool_schemas(include_code=True)
+    assert [t["function"]["name"] for t in with_code] == [
+        "vector_search",
+        "kg_query",
+        "web_search",
+        "search_code",
+        "get_symbol",
+        "impact_analysis",
+        "repo_overview",
+    ]
+    assert len(with_code) == 7
+
+
+class FakeCodeExecutor:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, dict]] = []
+
+    def execute(self, name: str, args: dict) -> dict:
+        self.calls.append((name, args))
+        return {"ok": True, "tool": name, "echo": args, "latency_ms": 0.5}
+
+
+def test_tool_executor_dispatches_code_tools() -> None:
+    code_executor = FakeCodeExecutor()
+    executor = ToolExecutor(search=None, kg=None, settings=Settings(), code_executor=code_executor)
+    out = executor.run("search_code", {"query": "ToolExecutor"})
+    assert out["ok"] is True
+    assert out["tool"] == "search_code"
+    assert out["echo"] == {"query": "ToolExecutor"}
+    assert code_executor.calls == [("search_code", {"query": "ToolExecutor"})]
+
+    plain = ToolExecutor(search=None, kg=None, settings=Settings())
+    assert plain.run("search_code", {"query": "x"})["ok"] is False
 
 
 def test_tool_result_text_truncates() -> None:
