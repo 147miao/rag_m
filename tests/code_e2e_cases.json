@@ -1,0 +1,92 @@
+[
+  {
+    "question": "ToolExecutor run vector_search 如何分发",
+    "expect_paths": [
+      "src/ragm/agent/tools.py"
+    ],
+    "expect_qualnames": [
+      "ToolExecutor"
+    ]
+  },
+  {
+    "question": "SessionStore get_history sqlite 历史",
+    "expect_paths": [
+      "src/ragm/conversation/store.py"
+    ],
+    "expect_qualnames": [
+      "SessionStore"
+    ]
+  },
+  {
+    "question": "ConfirmationStore consume token HMAC",
+    "expect_paths": [
+      "src/ragm/mcp/confirmation.py"
+    ],
+    "expect_qualnames": [
+      "ConfirmationStore"
+    ]
+  },
+  {
+    "question": "FallbackLLM build_llm provider 降级",
+    "expect_paths": [
+      "src/ragm/rag/llm_router.py"
+    ],
+    "expect_qualnames": [
+      "FallbackLLM"
+    ]
+  },
+  {
+    "question": "JobRunner retry tick 重试",
+    "expect_paths": [
+      "src/ragm/jobs/runner.py"
+    ],
+    "expect_qualnames": [
+      "JobRunner"
+    ]
+  },
+  {
+    "question": "build pipeline file_hash 增量",
+    "expect_paths": [
+      "src/ragm/ingest/pipeline.py"
+    ],
+    "expect_qualnames": [
+      "build"
+    ]
+  },
+  {
+    "question": "health providers circuit_open 健康检查",
+    "expect_paths": [
+      "src/ragm/api/routes.py"
+    ],
+    "expect_qualnames": [
+      "health"
+    ]
+  },
+  {
+    "question": "build_classifier rules lora 分类器",
+    "expect_paths": [
+      "src/ragm/classifier/factory.py"
+    ],
+    "expect_qualnames": [
+      "build_classifier"
+    ]
+  },
+  {
+    "question": "MilvusStore hybrid_search BM25 混合检索",
+    "expect_paths": [
+      "src/ragm/store/milvus_store.py"
+    ],
+    "expect_qualnames": [
+      "MilvusStore"
+    ]
+  },
+  {
+    "question": "LangGraphRagService stream",
+    "expect_paths": [
+      "src/ragm/rag/langgraph_service.py"
+    ],
+    "expect_qualnames": [
+      "LangGraphRagService"
+    ]
+  }
+]

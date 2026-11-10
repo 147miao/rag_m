@@ -26,6 +26,9 @@ from .. import __version__
 from ..agent.agent_graph import AgentGraph
 from ..agent.tools import ToolExecutor
 from ..classifier.factory import build_classifier
+from ..code.indexer import CodeIndexer
+from ..code.service import CodeService
+from ..code.store import CodeStore
 from ..config import get_settings, load_env_file
 from ..embeddings.reranker import build_reranker
 from ..graph.kg import KGStore
@@ -37,6 +40,7 @@ from ..rag.langgraph_service import LangGraphRagService
 from ..rag.llm_router import build_llm
 from ..rag.service import DemoRagService
 from ..store.search_service import SearchService
+from .code_routes import router as code_router
 from .jobs_routes import router as jobs_router
 from .mcp_routes import router as mcp_router
 from .routes import router
@@ -74,6 +78,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_mcp(app, settings)
     llm = build_llm(settings)
     app.state.llm = llm
+    try:
+        code_store = CodeStore(settings.code_store_path)
+        app.state.code_store = code_store
+        app.state.code_indexer = CodeIndexer(settings.code_store_path, settings.code_allowed_roots)
+        app.state.code_service = CodeService(
+            code_store,
+            llm=llm,
+            provider_getter=lambda: getattr(llm, "last_provider", None),
+        )
+        logger.info("code insight ready: db=%s", settings.code_store_path)
+    except Exception:
+        app.state.code_store = None
+        app.state.code_indexer = None
+        app.state.code_service = None
+        logger.warning("code insight unavailable", exc_info=True)
     logger.info("llm providers: %s", ", ".join(llm.provider_status()) or "none")
     configure_tracing(settings)
     # v1.1 W4：任务表恢复 + 单 worker 线程（JOBS_WORKER=false 时只入队不执行）。
@@ -164,6 +183,9 @@ def create_app() -> FastAPI:
     app.state.llm = None
     app.state.jobs_store = None
     app.state.jobs_runner = None
+    app.state.code_store = None
+    app.state.code_indexer = None
+    app.state.code_service = None
 
     app.add_middleware(
         CORSMiddleware,
@@ -205,6 +227,7 @@ def create_app() -> FastAPI:
     app.include_router(session_router)
     app.include_router(mcp_router)
     app.include_router(jobs_router)
+    app.include_router(code_router)
 
     @app.exception_handler(StarletteHTTPException)
     async def http_exception_handler(request: Request, exc: StarletteHTTPException):

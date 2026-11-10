@@ -141,6 +141,17 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 - Graph 1 跳 vs 2 跳、Agentic 15 题结果见 [docs/21-graph-agentic-v2.md](docs/21-graph-agentic-v2.md)：
   Graph 在 12 题上 1.00 vs 1.00（非劣无增益），Agentic accuracy 0.667、p50 3.78s、平均工具 1.53 次、超预算 0。
 
+## 三·八、代码库分析（code-insight）
+
+```bash
+python scripts/index_code.py --root ~/my_repo --name myrepo --reindex
+# 或 POST /api/code/repos {root, name}
+```
+
+- Python only；SQLite FTS5（无 GPU/Milvus）；函数/类级 chunk + 符号表 + 文件级 impact；
+- `/api/code/ask` 返回 `path:start-end` 引用；中文问题建议包含标识符/路径（FTS5 不切分中文）；
+- 详见 [docs/23-code-insight.md](docs/23-code-insight.md)。
+
 ## 三·七、CI 与容器
 
 - `make ci`：ruff（src/tests/scripts）+ pytest（**145 passed + 3 skipped**；设 `RAGM_LLM_E2E=1` 且配置 primary key 时 148 passed）+ 前端 build，本地等价 CI；
@@ -210,6 +221,14 @@ API（uvicorn）启动时 `lifespan` 先执行 `load_env_file()`：把当前目�
 | POST | `/api/ingest` | 异步入库任务（202 + `JobInfo.id`） |
 | GET | `/api/jobs/{id}` / `/api/jobs` | 任务状态 / 列表 |
 | POST | `/api/jobs/{id}/retry` | 重试 failed 任务 |
+| POST | `/api/code/repos` | 索引本地仓库（返回 repo_id + stats） |
+| GET | `/api/code/repos` / `/api/code/repos/{id}` | 仓库列表 / 详情 |
+| DELETE/POST | `/api/code/repos/{id}` / `.../reindex` | 删除 / 重建索引 |
+| GET | `/api/code/search` | FTS 代码检索（q/repo_id/k/path_prefix/kind） |
+| GET | `/api/code/symbol` | 按 qualname 精确取符号源码 |
+| GET | `/api/code/impact` | 文件级反向 import（启发式） |
+| GET | `/api/code/overview` | 仓库统计与 top 路径 |
+| POST | `/api/code/ask` | 代码问答（带 path:line 引用） |
 
 示例：
 
@@ -390,6 +409,7 @@ rag_m/
 | [docs/18-bench-speed-and-papers.md](docs/18-bench-speed-and-papers.md) | 测试加速与 arXiv 长文档 |
 | [docs/20-frontend-live.md](docs/20-frontend-live.md) | 前端去演示化与移动端修复 |
 | [docs/22-v1.1-features.md](docs/22-v1.1-features.md) | v1.1：多轮会话 / MCP / LLM 降级 / 异步入库 |
+| [docs/23-code-insight.md](docs/23-code-insight.md) | 代码库智能分析（Python AST + FTS5 + 代码问答） |
 | [docs/21-project-explained.md](docs/21-project-explained.md) | **项目详解：语言基础 + 外部库基础 + 理论基础（长文）** |
 
 ## 十五、致谢

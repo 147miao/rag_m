@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # v1.1 内置 LLM provider 链：opencode-go 主 → ollama gemma4 备 → 本地 ollama qwen2.5 兜底
@@ -155,6 +156,9 @@ class Settings(BaseSettings):
     # ---- async ingest jobs (v1.1 W4) ----
     # 空 = data_root/data/jobs.sqlite，由 jobs_store_path 解析。
     jobs_db_path: str = ""
+    code_enabled: bool = True
+    code_db_path: str = ""
+    code_allowed_roots: list[str] = Field(default_factory=lambda: [str(Path.home())])
     jobs_worker: bool = True
     # 总尝试次数（1 次初始 + N 次重试）：默认 4 = 1 次初始 + 3 次重试。
     jobs_max_attempts: int = 4
@@ -181,6 +185,13 @@ class Settings(BaseSettings):
         if self.session_db_path:
             return Path(self.session_db_path)
         return self.data_root / "data" / "sessions.sqlite"
+
+    @property
+    def code_store_path(self) -> Path:
+        """代码索引 SQLite 路径；CODE_DB_PATH 为空时落到 data_root/data/code_index.sqlite。"""
+        if self.code_db_path:
+            return Path(self.code_db_path)
+        return self.data_root / "data" / "code_index.sqlite"
 
     @property
     def jobs_store_path(self) -> Path:
