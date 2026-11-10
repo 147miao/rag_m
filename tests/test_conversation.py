@@ -9,6 +9,7 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
+from e2e_support import resolve_secret
 from httpx import ASGITransport, AsyncClient
 
 from ragm.api import routes
@@ -215,7 +216,11 @@ def test_rewriter_falls_back_on_failures(llm: FakeLLM) -> None:
 
 
 @pytest.mark.skipif(os.environ.get("RAGM_LLM_E2E") != "1", reason="真实 LLM 集成测试，设 RAGM_LLM_E2E=1 开启")
-def test_rewriter_real_llm_resolves_pronoun_to_user_subject() -> None:
+def test_rewriter_real_llm_resolves_pronoun_to_user_subject(monkeypatch) -> None:
+    # 有 OPENCODE_GO_API_KEY（环境变量或 .env）时优先走真实 primary，否则回退 Ollama。
+    api_key = resolve_secret("OPENCODE_GO_API_KEY")
+    if api_key:
+        monkeypatch.setenv("OPENCODE_GO_API_KEY", api_key)
     history = [
         {"role": "user", "content": "鸣人的父亲是波风水门"},
         {"role": "assistant", "content": "是的，鸣人的父亲是波风水门。"},

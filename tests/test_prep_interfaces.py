@@ -1,4 +1,4 @@
-"""prep/v1.1 接口层契约测试：未实现的骨架路由返回 501，新增 schemas 可构造。"""
+"""prep/v1.1 接口层契约测试：全部骨架路由已实现，此处保留 schemas / openapi 契约回归。"""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -41,12 +41,8 @@ async def client(monkeypatch):
     get_settings.cache_clear()
 
 
-# 会话接口已由 feat/session 实现（见 tests/test_conversation.py），此处只保留其余骨架路由。
-ROUTE_CASES: list[tuple[str, str, dict | None]] = []
-
-
-# MCP 路由已由 feat/mcp 实现：默认 MCP_ENABLED=false 时返回 503，不再是 501 骨架；
-# 启用/调用/确认流程见 tests/test_mcp.py。
+# 会话 / MCP / 任务路由均已实现，无 501 骨架；此处只保留路由注册与 schemas 契约。
+# MCP 默认 MCP_ENABLED=false 时返回 503（启用/调用/确认流程见 tests/test_mcp.py）。
 MCP_ROUTE_CASES = [
     ("GET", "/api/mcp/tools", None),
     ("POST", "/api/mcp/call", {"tool": "read_file", "args": {"path": "a.txt"}}),
@@ -190,7 +186,7 @@ def test_settings_v11_defaults(monkeypatch) -> None:
 
     providers = settings.resolved_llm_providers
     assert [item["name"] for item in providers] == ["opencode-go", "ollama"]
-    assert providers[0]["model"] == "deepseek-v4-flash"
+    assert providers[0]["model"] == "deepseek-v4.1-flash"
     assert providers[1]["model"] == "gemma4:31b-cloud"
 
 

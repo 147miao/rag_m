@@ -7,15 +7,19 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # v1.1 内置 LLM provider 链：opencode-go 主，ollama 备（可用 LLM_PROVIDERS JSON 覆盖）。
+# model 必须是 relay `GET {base_url}/models` 实际返回的 id（本机：deepseek-v4.1-flash），否则 404 后降级。
 DEFAULT_LLM_PROVIDERS: tuple[dict[str, Any], ...] = (
     {
         "name": "opencode-go",
         "base_url": "http://127.0.0.1:8788/inference/go/v1",
-        "model": "deepseek-v4-flash",
+        "model": "deepseek-v4.1-flash",
         "api_key_env": "OPENCODE_GO_API_KEY",
+        # relay 要求每次请求带会话头；$UUID 由 LLMClient 每次请求替换为新的 uuid4。
+        "extra_headers": {"x-opencode-session": "$UUID"},
         "first_token_timeout": 15,
     },
     {
@@ -26,6 +30,23 @@ DEFAULT_LLM_PROVIDERS: tuple[dict[str, Any], ...] = (
         "first_token_timeout": 20,
     },
 )
+
+
+def load_env_file(path: str | Path | None = None) -> bool:
+    """把 .env 补进 os.environ（override=False）：只补缺失变量，不覆盖已 export 的值。
+
+    - 默认读当前工作目录的 .env；systemd 的 WorkingDirectory=仓库根时即命中；
+    - api_key_env 只认 os.environ，所以 API 启动（lifespan）要先调用本函数，Settings 本身已读 .env；
+    - 文件缺失 / 解析失败静默返回 False；不写日志，避免把 key 打进日志。
+    """
+    env_path = Path(path) if path is not None else Path(".env")
+    if not env_path.is_file():
+        return False
+    try:
+        load_dotenv(env_path, override=False)
+    except Exception:  # noqa: BLE001 - .env 损坏不应阻止服务启动
+        return False
+    return True
 
 
 class Settings(BaseSettings):

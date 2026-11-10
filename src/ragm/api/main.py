@@ -26,7 +26,7 @@ from .. import __version__
 from ..agent.agent_graph import AgentGraph
 from ..agent.tools import ToolExecutor
 from ..classifier.factory import build_classifier
-from ..config import get_settings
+from ..config import get_settings, load_env_file
 from ..embeddings.reranker import build_reranker
 from ..graph.kg import KGStore
 from ..jobs.runner import JobRunner
@@ -62,6 +62,9 @@ def _write_log(record: dict) -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
+    # 启动最早期把 .env 补进 os.environ（只补缺失项）：api_key_env（如 OPENCODE_GO_API_KEY）
+    # 只认环境变量，systemd 单元里通常没有；Settings 本身已读 .env，这里补的是密钥类配置。
+    load_env_file()
     app.state.started_at = time.monotonic()
     app.state.service = DemoRagService()
     app.state.classifier = build_classifier()

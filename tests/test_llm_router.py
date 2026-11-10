@@ -3,17 +3,21 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
+import uuid
 from types import SimpleNamespace
 
+import httpx
 import pytest
+from e2e_support import resolve_secret
 from httpx import ASGITransport, AsyncClient
 
 from ragm.api import routes
 from ragm.api.main import create_app
 from ragm.api.schemas import HealthCheck
-from ragm.config import Settings, get_settings
-from ragm.rag.llm import LLMError
+from ragm.config import Settings, get_settings, load_env_file
+from ragm.rag.llm import LLMClient, LLMError
 from ragm.rag.llm_router import CircuitBreaker, FallbackLLM, build_llm
 
 
@@ -311,6 +315,147 @@ def test_build_llm_skips_default_primary_without_key(monkeypatch) -> None:
     llm = build_llm(settings)
 
     assert llm.provider_names == ["ollama"]
+
+
+def test_load_env_file_fills_missing_provider_key(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("OPENCODE_GO_API_KEY", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("OPENCODE_GO_API_KEY=fake-primary-key\n", encoding="utf-8")
+
+    try:
+        assert load_env_file(env_file) is True
+        assert os.environ["OPENCODE_GO_API_KEY"] == "fake-primary-key"
+
+        get_settings.cache_clear()
+        llm = build_llm()  # 走 get_settings() 的内置 provider 链，key 由 os.environ 解析
+        assert llm.provider_names[0] == "opencode-go"
+        assert llm.clients[0].api_key == "fake-primary-key"
+    finally:
+        os.environ.pop("OPENCODE_GO_API_KEY", None)
+        get_settings.cache_clear()
+
+
+def test_load_env_file_does_not_override_exported(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("OPENCODE_GO_API_KEY", "exported-key")
+    env_file = tmp_path / ".env"
+    env_file.write_text("OPENCODE_GO_API_KEY=file-key\n", encoding="utf-8")
+
+    assert load_env_file(env_file) is True
+
+    # override=False：已 export 的变量优先，进程内不会被 .env 覆盖
+    assert os.environ["OPENCODE_GO_API_KEY"] == "exported-key"
+
+
+def test_load_env_file_missing_is_silent(tmp_path, caplog) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    assert load_env_file(tmp_path / "missing.env") is False
+
+    assert "OPENCODE_GO_API_KEY" not in caplog.text
+
+
+# ---------- extra_headers（opencode-go 会话头） ----------
+def test_llm_client_sends_extra_headers_and_rotates_uuid(monkeypatch) -> None:
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if json.loads(request.content).get("stream"):
+            body = 'data: {"choices":[{"delta":{"content":"hi"}}]}\n\ndata: [DONE]\n\n'
+            return httpx.Response(200, text=body, headers={"content-type": "text/event-stream"})
+        return httpx.Response(200, json={"choices": [{"message": {"content": "ok"}}], "usage": {}})
+
+    client = LLMClient(
+        "http://relay.local/v1",
+        "deepseek-v4.1-flash",
+        "secret",
+        extra_headers={"x-opencode-session": "$UUID", "X-Static": "fixed"},
+    )
+    transport = httpx.MockTransport(handler)
+    monkeypatch.setattr(client, "_client", lambda: httpx.Client(transport=transport))
+
+    assert client.chat([{"role": "user", "content": "ping"}])["text"] == "ok"
+    assert list(client.stream_chat([{"role": "user", "content": "ping"}])) == ["hi"]
+
+    assert [request.headers["X-Static"] for request in seen] == ["fixed", "fixed"]
+    assert all(request.headers["Authorization"] == "Bearer secret" for request in seen)
+    session_ids = [request.headers["x-opencode-session"] for request in seen]
+    assert all(uuid.UUID(value).version == 4 for value in session_ids)
+    # 每次请求生成新的会话 id（chat / stream 不能复用同一个 uuid）
+    assert session_ids[0] != session_ids[1]
+
+
+def test_build_provider_passes_extra_headers_to_client() -> None:
+    captured: dict[str, object] = {}
+
+    def factory(
+        base_url: str,
+        model: str,
+        api_key: str,
+        temperature: float,
+        *,
+        timeout: float,
+        extra_headers: dict[str, str],
+    ) -> FakeClient:
+        captured.update(base_url=base_url, timeout=timeout, extra_headers=extra_headers)
+        return FakeClient("opencode-go")
+
+    llm = FallbackLLM(
+        [
+            {
+                "name": "opencode-go",
+                "base_url": "http://127.0.0.1:8788/inference/go/v1",
+                "model": "deepseek-v4.1-flash",
+                "api_key": "secret",
+                "extra_headers": {"x-opencode-session": "$UUID"},
+            }
+        ],
+        client_factory=factory,
+    )
+
+    assert llm.provider_names == ["opencode-go"]
+    assert captured["extra_headers"] == {"x-opencode-session": "$UUID"}
+
+
+def test_invalid_extra_headers_skips_provider() -> None:
+    llm = FallbackLLM(
+        [
+            {
+                "name": "bad-headers",
+                "base_url": "http://127.0.0.1:1/v1",
+                "model": "m",
+                "api_key": "local",
+                "extra_headers": ["x-opencode-session"],
+            }
+        ]
+    )
+
+    assert llm.provider_names == []
+    assert llm.skipped == [{"name": "bad-headers", "reason": "extra_headers must be an object"}]
+
+
+# ---------- real primary provider (E2E) ----------
+@pytest.mark.skipif(os.environ.get("RAGM_LLM_E2E") != "1", reason="真实 LLM 集成测试，设 RAGM_LLM_E2E=1 开启")
+def test_real_primary_provider_chat_and_stream(monkeypatch) -> None:
+    api_key = resolve_secret("OPENCODE_GO_API_KEY")
+    if not api_key:
+        pytest.skip("OPENCODE_GO_API_KEY 未设置（环境变量或 .env），跳过真实 primary")
+    monkeypatch.setenv("OPENCODE_GO_API_KEY", api_key)
+    llm = build_llm(Settings(_env_file=None))
+    assert llm.provider_names and llm.provider_names[0] == "opencode-go", llm.skipped
+
+    prompt = [{"role": "user", "content": "Reply with exactly: OK"}]
+    chat = llm.chat(prompt, max_tokens=512)
+    assert chat["text"].strip(), "primary chat 返回空内容"
+    assert llm.last_provider == "opencode-go"
+
+    stream = llm.stream_chat(prompt, max_tokens=512)
+    try:
+        first = next(stream)
+    finally:
+        stream.close()
+    assert first.strip(), "primary stream 首 token 为空"
+    assert llm.last_provider == "opencode-go"
 
 
 # ---------- health ----------

@@ -227,6 +227,29 @@ class FallbackLLM:
         # 本地 OpenAI 兼容服务通常不校验 key；沿用项目既有默认值。
         return str(data.get("api_key") or "ollama")
 
+    def _normalize_extra_headers(self, raw: Any, name: str) -> dict[str, str] | None:
+        """校验 provider 的 extra_headers（字符串→字符串）；非法配置跳过该 provider。
+
+        值里的 `$UUID` 由 LLMClient 在每次请求时替换为新的 uuid4（供 opencode-go 的
+        x-opencode-session 等会话头使用）。
+        """
+        if raw is None:
+            return {}
+        if not isinstance(raw, Mapping):
+            reason = "extra_headers must be an object"
+            logger.warning("LLM provider %s skipped: %s", name, reason)
+            self.skipped.append({"name": name, "reason": reason})
+            return None
+        headers: dict[str, str] = {}
+        for key, value in raw.items():
+            if not isinstance(key, str) or not isinstance(value, str) or not key.strip():
+                reason = "extra_headers must be string:string"
+                logger.warning("LLM provider %s skipped: %s", name, reason)
+                self.skipped.append({"name": name, "reason": reason})
+                return None
+            headers[key] = value
+        return headers
+
     def _build_provider(
         self,
         spec: Mapping[str, Any] | Any,
@@ -253,10 +276,20 @@ class FallbackLLM:
                 api_key = self._resolve_api_key(data, name)
                 if api_key is None:
                     return None
+                extra_headers = self._normalize_extra_headers(data.get("extra_headers"), name)
+                if extra_headers is None:
+                    return None
                 temperature = _to_float(data.get("temperature"), self.temperature)
                 # 底层 httpx 超时不能短于首 token 预算；整请求超时由 _call_with_timeout 兜底。
                 http_timeout = _to_float(data.get("timeout"), max(self.chat_timeout, first_token_timeout))
-                client = factory(base_url, model, api_key, temperature, timeout=http_timeout)
+                client = factory(
+                    base_url,
+                    model,
+                    api_key,
+                    temperature,
+                    timeout=http_timeout,
+                    extra_headers=extra_headers,
+                )
         else:
             client = spec
             name = str(getattr(client, "name", None) or getattr(client, "model", None) or f"provider-{index}")
