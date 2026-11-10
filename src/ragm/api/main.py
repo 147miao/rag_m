@@ -78,21 +78,24 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     init_mcp(app, settings)
     llm = build_llm(settings)
     app.state.llm = llm
-    try:
-        code_store = CodeStore(settings.code_store_path)
-        app.state.code_store = code_store
-        app.state.code_indexer = CodeIndexer(settings.code_store_path, settings.code_allowed_roots)
-        app.state.code_service = CodeService(
-            code_store,
-            llm=llm,
-            provider_getter=lambda: getattr(llm, "last_provider", None),
-        )
-        logger.info("code insight ready: db=%s", settings.code_store_path)
-    except Exception:
-        app.state.code_store = None
-        app.state.code_indexer = None
-        app.state.code_service = None
-        logger.warning("code insight unavailable", exc_info=True)
+    if settings.code_enabled:
+        try:
+            code_store = CodeStore(settings.code_store_path)
+            app.state.code_store = code_store
+            app.state.code_indexer = CodeIndexer(settings.code_store_path, settings.code_allowed_roots)
+            app.state.code_service = CodeService(
+                code_store,
+                llm=llm,
+                provider_getter=lambda: getattr(llm, "last_provider", None),
+            )
+            logger.info("code insight ready: db=%s", settings.code_store_path)
+        except Exception:
+            app.state.code_store = None
+            app.state.code_indexer = None
+            app.state.code_service = None
+            logger.warning("code insight unavailable", exc_info=True)
+    else:
+        logger.info("code insight disabled (CODE_ENABLED=false)")
     logger.info("llm providers: %s", ", ".join(llm.provider_status()) or "none")
     configure_tracing(settings)
     # v1.1 W4：任务表恢复 + 单 worker 线程（JOBS_WORKER=false 时只入队不执行）。

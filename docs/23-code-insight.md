@@ -34,12 +34,12 @@ curl -s -X POST localhost:8000/api/code/ask -H "Content-Type: application/json" 
 | `agent/code_tools.py` | search_code/get_symbol/impact_analysis/repo_overview 工具定义 |
 
 ## 实测（rag_m 自举）
-- 索引：132–143 文件、1.1–1.3k 符号、1.3k chunks、约 1.5s（增量约 11ms）；
-- 检索：10 个标识符类问题 hit@5 = 10/10（`tests/test_code_e2e.py`）；
+- 索引：145 文件、1,285 符号、1,327 chunks、约 1.5s（增量约 8ms）；
+- 检索：10 个标识符类问题 path/qualname hit@5 = 10/10（`tests/test_code_e2e.py`；问题含精确标识符，属偏乐观的 fixtures）；
 - 问答：10 题真实 LLM，引用 path 全部存在（refusal 情况已通过查询扩展 + 抽取式兜底收敛）。
 
 ## 限制
 - 仅 Python（TS/Go 及树莓派语言的 tree-sitter 解析留 v2）；
 - FTS5 unicode61 不切分中文：中文自然语言问题检索弱，建议问题中包含标识符/路径；v2 接 dense embedding；
-- impact 只做文件级反向 import，不承诺调用链/数据流；
+- impact 只做文件级反向 import（按模块名后缀匹配，basename 相似会误报），不承诺调用链/数据流；
 - 单文件 >1MB 或 >5000 行跳过；>5000 文件暂同步索引。

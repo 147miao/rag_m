@@ -696,3 +696,22 @@ def test_agent_tool_schemas() -> None:
         assert schema["type"] == "function"
         assert schema["function"]["parameters"]["type"] == "object"
         assert "required" in schema["function"]["parameters"]
+
+@pytest.mark.anyio
+async def test_code_disabled_returns_503(monkeypatch):
+    """CODE_ENABLED=false 时不应装配 code 服务，路由返回 503。"""
+    from httpx import ASGITransport, AsyncClient
+
+    from ragm.api.main import create_app
+    from ragm.config import get_settings
+
+    monkeypatch.setenv("CODE_ENABLED", "false")
+    monkeypatch.setenv("CLASSIFIER_BACKEND", "rules")
+    monkeypatch.setenv("RAG_BACKEND", "demo")
+    get_settings.cache_clear()
+    app = create_app()
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        resp = await client.get("/api/code/repos")
+        assert resp.status_code == 503
+    get_settings.cache_clear()
