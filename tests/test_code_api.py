@@ -726,3 +726,44 @@ def test_code_disabled_returns_503(monkeypatch):
         resp = client.get("/api/code/repos")
         assert resp.status_code == 503
     get_settings.cache_clear()
+
+def test_main_injects_code_tools_into_agent(monkeypatch, tmp_path):
+    """CODE_ENABLED=true 时 main 应把 7 个工具与 CodeToolExecutor 注入 AgentGraph。"""
+    from fastapi.testclient import TestClient
+
+    from ragm.api import main
+    from ragm.config import get_settings
+
+    class DummySearch:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def info(self):
+            return {"collection": "dummy", "rows": 0}
+
+        def search_with_scores(self, *args, **kwargs):
+            return {"hits": []}
+
+        def chunks_by_titles(self, *args, **kwargs):
+            return []
+
+    def _no_kg(*args, **kwargs):
+        raise RuntimeError("no neo4j in test")
+
+    monkeypatch.setattr(main, "SearchService", DummySearch)
+    monkeypatch.setattr(main, "KGStore", _no_kg)
+    monkeypatch.setenv("CLASSIFIER_BACKEND", "rules")
+    monkeypatch.setenv("RAG_BACKEND", "langgraph")
+    monkeypatch.setenv("RERANK_ENABLED", "false")
+    monkeypatch.setenv("CODE_ENABLED", "true")
+    monkeypatch.setenv("CODE_DB_PATH", str(tmp_path / "code.sqlite"))
+    monkeypatch.setenv("JOBS_WORKER", "false")
+    get_settings.cache_clear()
+    app = main.create_app()
+    with TestClient(app) as client:
+        svc = app.state.service
+        assert svc.agent is not None
+        assert len(svc.agent.tool_schemas) == 7
+        assert svc.agent.executor.code_executor is not None
+        assert client.get("/api/health").status_code == 200
+    get_settings.cache_clear()
