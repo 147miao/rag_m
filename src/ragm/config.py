@@ -7,6 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # v1.1 内置 LLM provider 链：opencode-go 主，ollama 备（可用 LLM_PROVIDERS JSON 覆盖）。
@@ -29,6 +30,23 @@ DEFAULT_LLM_PROVIDERS: tuple[dict[str, Any], ...] = (
         "first_token_timeout": 20,
     },
 )
+
+
+def load_env_file(path: str | Path | None = None) -> bool:
+    """把 .env 补进 os.environ（override=False）：只补缺失变量，不覆盖已 export 的值。
+
+    - 默认读当前工作目录的 .env；systemd 的 WorkingDirectory=仓库根时即命中；
+    - api_key_env 只认 os.environ，所以 API 启动（lifespan）要先调用本函数，Settings 本身已读 .env；
+    - 文件缺失 / 解析失败静默返回 False；不写日志，避免把 key 打进日志。
+    """
+    env_path = Path(path) if path is not None else Path(".env")
+    if not env_path.is_file():
+        return False
+    try:
+        load_dotenv(env_path, override=False)
+    except Exception:  # noqa: BLE001 - .env 损坏不应阻止服务启动
+        return False
+    return True
 
 
 class Settings(BaseSettings):

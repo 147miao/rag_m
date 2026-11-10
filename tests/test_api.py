@@ -1,12 +1,16 @@
 """API 契约测试：不依赖 Milvus / Ollama（健康检查允许 degraded）。"""
 from __future__ import annotations
 
+import os
+
 import pytest
+from fastapi import FastAPI
 from httpx import ASGITransport, AsyncClient
 
+from ragm.api import main as api_main
 from ragm.api import routes
 from ragm.api.main import create_app
-from ragm.config import get_settings
+from ragm.config import Settings, get_settings
 
 
 @pytest.fixture
@@ -35,6 +39,61 @@ async def unavailable_client(monkeypatch):
     async with AsyncClient(transport=transport, base_url="http://test") as c:
         yield c
     get_settings.cache_clear()
+
+
+async def test_lifespan_loads_dotenv_before_building_llm(monkeypatch, tmp_path) -> None:
+    """API 启动（lifespan）先把 .env 补进 os.environ，再 build_llm，primary 才能拿到 key。"""
+    monkeypatch.delenv("OPENCODE_GO_API_KEY", raising=False)
+    (tmp_path / ".env").write_text("OPENCODE_GO_API_KEY=fake-lifespan-key\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    settings = Settings(
+        _env_file=None,
+        data_root=tmp_path,
+        jobs_worker=False,
+        jobs_db_path=str(tmp_path / "jobs.sqlite"),
+        rag_backend="demo",
+        classifier_backend="rules",
+    )
+
+    class _StubSearch:
+        def info(self) -> str:
+            return "stub"
+
+    class _StubJobsStore:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def recover(self) -> None:
+            pass
+
+    class _StubRunner:
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def start(self) -> None:
+            pass
+
+        def shutdown(self) -> None:
+            pass
+
+    monkeypatch.setattr(api_main, "get_settings", lambda: settings)
+    monkeypatch.setattr(api_main, "build_classifier", lambda: object())
+    monkeypatch.setattr(api_main, "init_mcp", lambda app, s: None)
+    monkeypatch.setattr(api_main, "configure_tracing", lambda s: None)
+    monkeypatch.setattr(api_main, "SearchService", lambda s: _StubSearch())
+    monkeypatch.setattr(api_main, "JobsStore", _StubJobsStore)
+    monkeypatch.setattr(api_main, "JobRunner", _StubRunner)
+
+    try:
+        app = FastAPI()
+        async with api_main.lifespan(app):
+            assert os.environ.get("OPENCODE_GO_API_KEY") == "fake-lifespan-key"
+            assert app.state.llm is not None
+            assert app.state.llm.provider_names[0] == "opencode-go"
+            assert app.state.llm.clients[0].api_key == "fake-lifespan-key"
+    finally:
+        os.environ.pop("OPENCODE_GO_API_KEY", None)
+        get_settings.cache_clear()
 
 
 async def test_health(client: AsyncClient) -> None:

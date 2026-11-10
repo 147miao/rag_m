@@ -16,7 +16,7 @@ from httpx import ASGITransport, AsyncClient
 from ragm.api import routes
 from ragm.api.main import create_app
 from ragm.api.schemas import HealthCheck
-from ragm.config import Settings, get_settings
+from ragm.config import Settings, get_settings, load_env_file
 from ragm.rag.llm import LLMClient, LLMError
 from ragm.rag.llm_router import CircuitBreaker, FallbackLLM, build_llm
 
@@ -315,6 +315,43 @@ def test_build_llm_skips_default_primary_without_key(monkeypatch) -> None:
     llm = build_llm(settings)
 
     assert llm.provider_names == ["ollama"]
+
+
+def test_load_env_file_fills_missing_provider_key(monkeypatch, tmp_path) -> None:
+    monkeypatch.delenv("OPENCODE_GO_API_KEY", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("OPENCODE_GO_API_KEY=fake-primary-key\n", encoding="utf-8")
+
+    try:
+        assert load_env_file(env_file) is True
+        assert os.environ["OPENCODE_GO_API_KEY"] == "fake-primary-key"
+
+        get_settings.cache_clear()
+        llm = build_llm()  # 走 get_settings() 的内置 provider 链，key 由 os.environ 解析
+        assert llm.provider_names[0] == "opencode-go"
+        assert llm.clients[0].api_key == "fake-primary-key"
+    finally:
+        os.environ.pop("OPENCODE_GO_API_KEY", None)
+        get_settings.cache_clear()
+
+
+def test_load_env_file_does_not_override_exported(monkeypatch, tmp_path) -> None:
+    monkeypatch.setenv("OPENCODE_GO_API_KEY", "exported-key")
+    env_file = tmp_path / ".env"
+    env_file.write_text("OPENCODE_GO_API_KEY=file-key\n", encoding="utf-8")
+
+    assert load_env_file(env_file) is True
+
+    # override=False：已 export 的变量优先，进程内不会被 .env 覆盖
+    assert os.environ["OPENCODE_GO_API_KEY"] == "exported-key"
+
+
+def test_load_env_file_missing_is_silent(tmp_path, caplog) -> None:
+    caplog.set_level(logging.DEBUG)
+
+    assert load_env_file(tmp_path / "missing.env") is False
+
+    assert "OPENCODE_GO_API_KEY" not in caplog.text
 
 
 # ---------- extra_headers（opencode-go 会话头） ----------

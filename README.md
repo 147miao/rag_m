@@ -143,7 +143,7 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 
 ## 三·七、CI 与容器
 
-- `make ci`：ruff（src/tests/scripts）+ pytest（**139 passed + 2 skipped**；设 `RAGM_LLM_E2E=1` 且配置 primary key 时 141 passed）+ 前端 build，本地等价 CI；
+- `make ci`：ruff（src/tests/scripts）+ pytest（**143 passed + 2 skipped**；设 `RAGM_LLM_E2E=1` 且配置 primary key 时 145 passed）+ 前端 build，本地等价 CI；
 - GitHub Actions：`.github/workflows/ci.yml`（lint + tests + 检索门禁 + web build）；
 - 容器：`docker/Dockerfile.api` + compose `app` profile（含 GPU 直通、`/api/readyz` 健康检查）。
   数据/模型需放 `$HOME/ragm_data` 并挂载到容器 `/data`；镜像未在本机实际构建（torch 体积大）。
@@ -174,7 +174,7 @@ make eval    # 检索 + 生成评测（需要 API/LLM）
 | `SESSION_DB_PATH` / `SESSION_MAX_TURNS` / `SESSION_MAX_CHARS` / `SESSION_REWRITE_ENABLED` | 空 / 6 / 4000 / true | 会话 SQLite 路径、历史轮数、字符预算、指代改写 + 子问题拆解开关 |
 | `MCP_ENABLED` / `MCP_SANDBOX_ROOT` / `MCP_CONFIRM_TTL_S` / `MCP_CONFIRM_SECRET` | false / 空 / 60 / 空 | MCP 开关、沙箱根、确认 token TTL 与 HMAC secret（空 = 进程随机） |
 | `LLM_PROVIDERS` / `LLM_CHAT_TIMEOUT` / `LLM_FIRST_TOKEN_TIMEOUT` | 空（内置链）/ 60 / 15 | provider 链单行 JSON；整请求/首 token 超时；`/api/health` 的 `providers` 检查逐个返回各 provider 的 `state` / `failures` |
-| `OPENCODE_GO_API_KEY` | 空 | opencode-go 主 provider 的 key（只从环境变量读） |
+| `OPENCODE_GO_API_KEY` | 空 | opencode-go 主 provider 的 key（只从环境变量读；API 启动时会把仓库根 `.env` 补进进程环境，见下） |
 | `JOBS_DB_PATH` / `JOBS_WORKER` / `JOBS_MAX_ATTEMPTS` | 空 / true / 4 | 任务表路径、worker 开关、总尝试次数（4 = 1 次初始 + 3 次重试） |
 
 `LLM_PROVIDERS` 单行 JSON 示例（键：`name` / `base_url` / `model` / `api_key_env` / `api_key` / `first_token_timeout` / `extra_headers`）：
@@ -185,6 +185,9 @@ LLM_PROVIDERS='[{"name":"opencode-go","base_url":"http://127.0.0.1:8788/inferenc
 
 `extra_headers` 是「请求头 → 值」对象；值里的 `$UUID` 每次请求替换为新 uuid4。
 opencode-go relay 要求每次请求带 `x-opencode-session`（缺失返回 400），内置链已默认携带。
+
+API（uvicorn）启动时 `lifespan` 先执行 `load_env_file()`：把当前目录 `.env` 补进进程环境（`override=False`，只补缺失项，不覆盖已 export 的变量；失败静默）。
+因此 systemd `WorkingDirectory=<仓库根>` 的服务重启后即可读到 `.env` 里的 `OPENCODE_GO_API_KEY`；已 export 的环境变量优先。
 
 ## 五、API
 
